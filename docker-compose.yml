@@ -1,0 +1,45 @@
+version: '3.8'
+
+services:
+  pr-review:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: pr-review-bot
+    volumes:
+      # Mount PR export folder
+      - ./pr_export:/app/pr_export:ro
+      # Mount workspace for cloned repos
+      - ./workspace:/app/workspace
+      # Mount secrets (optional)
+      - ./secret:/app/secret:ro
+    environment:
+      # GitHub App Configuration
+      - GITHUB_APP_ID=${GITHUB_APP_ID}
+      - GITHUB_PRIVATE_KEY_PATH=/app/secret/private-key.pem
+      - GITHUB_WEBHOOK_SECRET=${GITHUB_WEBHOOK_SECRET}
+      # LLM Configuration
+      - LLM_API_KEY=${LLM_API_KEY}
+      - LLM_BASE_URL=${LLM_BASE_URL}
+      - LLM_MODEL=${LLM_MODEL:-claude-3-sonnet}
+      # Application
+      - PORT=3000
+    ports:
+      - "3000:3000"
+    restart: unless-stopped
+
+  # Development/Test service
+  pr-review-dev:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: pr-review-dev
+    volumes:
+      - .:/app
+      - ./pr_export:/app/pr_export
+      - ./workspace:/app/workspace
+    environment:
+      - PYTHONDONTWRITEBYTECODE=1
+    command: python dev/test_workflow.py
+    profiles:
+      - dev

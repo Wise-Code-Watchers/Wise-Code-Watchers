@@ -1,0 +1,100 @@
+from knowledge.base import KnowledgeBase, KnowledgeEntry
+
+
+class BestPracticesKB(KnowledgeBase):
+    def _load_entries(self):
+        self.entries = [
+            KnowledgeEntry(
+                id="bp001",
+                category="error_handling",
+                title="Specific Exception Handling",
+                description="Catch specific exceptions rather than bare except clauses",
+                example="try:\n    risky_operation()\nexcept ValueError as e:\n    handle_value_error(e)",
+                tags=["exceptions", "error-handling", "python"],
+            ),
+            KnowledgeEntry(
+                id="bp002",
+                category="error_handling",
+                title="Don't Swallow Exceptions",
+                description="Avoid catching exceptions without proper handling or logging",
+                severity="medium",
+                tags=["exceptions", "error-handling", "debugging"],
+            ),
+            KnowledgeEntry(
+                id="bp003",
+                category="testing",
+                title="Unit Test Coverage",
+                description="Write unit tests for critical business logic and edge cases",
+                tags=["testing", "unit-tests", "coverage"],
+            ),
+            KnowledgeEntry(
+                id="bp004",
+                category="security",
+                title="Input Validation",
+                description="Always validate and sanitize user input before processing",
+                example="def process_input(data: str) -> str:\n    if not data or len(data) > MAX_LENGTH:\n        raise ValueError('Invalid input')\n    return sanitize(data)",
+                tags=["input-validation", "security", "sanitization"],
+            ),
+            KnowledgeEntry(
+                id="bp005",
+                category="performance",
+                title="Avoid N+1 Queries",
+                description="Use eager loading or batch queries instead of querying in loops",
+                severity="medium",
+                tags=["n+1", "database", "performance", "orm"],
+            ),
+            KnowledgeEntry(
+                id="bp006",
+                category="documentation",
+                title="Docstrings",
+                description="Add docstrings to public functions and classes explaining purpose and parameters",
+                example='def calculate_total(items: list[Item]) -> float:\n    """Calculate the total price of items.\n    \n    Args:\n        items: List of items with price attribute\n    \n    Returns:\n        Total price as float\n    """',
+                tags=["documentation", "docstrings", "readability"],
+            ),
+            KnowledgeEntry(
+                id="bp007",
+                category="security",
+                title="Parameterized Queries",
+                description="Use parameterized queries or ORM to prevent SQL injection",
+                example="cursor.execute('SELECT * FROM users WHERE id = ?', (user_id,))",
+                tags=["sql", "parameterized", "security", "database"],
+            ),
+            KnowledgeEntry(
+                id="bp008",
+                category="code_quality",
+                title="DRY Principle",
+                description="Don't Repeat Yourself - extract common code into reusable functions",
+                tags=["dry", "refactoring", "maintainability"],
+            ),
+            KnowledgeEntry(
+                id="bp009",
+                category="code_quality",
+                title="Meaningful Names",
+                description="Use descriptive names for variables, functions, and classes",
+                example="# Bad: x, temp, data\n# Good: user_count, cached_response, order_items",
+                tags=["naming", "readability", "clean-code"],
+            ),
+            KnowledgeEntry(
+                id="bp010",
+                category="async",
+                title="Async Best Practices",
+                description="Use async/await properly and avoid blocking operations in async code",
+                tags=["async", "concurrency", "performance"],
+            ),
+            KnowledgeEntry(
+                id="bp011",
+                category="logging",
+                title="Structured Logging",
+                description="Use structured logging with appropriate levels and context",
+                example="logger.info('User action', extra={'user_id': user.id, 'action': 'login'})",
+                tags=["logging", "observability", "debugging"],
+            ),
+            KnowledgeEntry(
+                id="bp012",
+                category="configuration",
+                title="Environment Variables",
+                description="Use environment variables for configuration, especially secrets",
+                example="DATABASE_URL = os.getenv('DATABASE_URL')",
+                tags=["configuration", "environment", "secrets", "12-factor"],
+            ),
+        ]
