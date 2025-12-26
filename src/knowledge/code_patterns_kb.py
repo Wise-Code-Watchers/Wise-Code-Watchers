@@ -1,0 +1,92 @@
+from src.knowledge.base import KnowledgeBase, KnowledgeEntry
+
+
+class CodePatternsKB(KnowledgeBase):
+    def _load_entries(self):
+        self.entries = [
+            KnowledgeEntry(
+                id="cp001",
+                category="design_pattern",
+                title="Singleton Pattern",
+                description="Ensures a class has only one instance and provides global access to it",
+                pattern=r"class\s+\w+:\s*_instance\s*=\s*None",
+                example="class Singleton:\n    _instance = None\n    def __new__(cls):\n        if cls._instance is None:\n            cls._instance = super().__new__(cls)\n        return cls._instance",
+                tags=["singleton", "creational", "design-pattern"],
+            ),
+            KnowledgeEntry(
+                id="cp002",
+                category="anti_pattern",
+                title="God Class",
+                description="A class that knows too much or does too much, violating single responsibility",
+                pattern=r"class\s+\w+:.*(?:def\s+\w+.*){20,}",
+                severity="medium",
+                tags=["god-class", "anti-pattern", "srp"],
+            ),
+            KnowledgeEntry(
+                id="cp003",
+                category="anti_pattern",
+                title="Magic Numbers",
+                description="Using unexplained numeric literals in code instead of named constants",
+                pattern=r"(?:if|while|for).*(?<!\w)\d{2,}(?!\w)",
+                severity="low",
+                tags=["magic-numbers", "readability", "maintainability"],
+            ),
+            KnowledgeEntry(
+                id="cp004",
+                category="best_practice",
+                title="Early Return",
+                description="Return early from functions to reduce nesting and improve readability",
+                example="def process(data):\n    if not data:\n        return None\n    # main logic here",
+                tags=["early-return", "readability", "clean-code"],
+            ),
+            KnowledgeEntry(
+                id="cp005",
+                category="anti_pattern",
+                title="Deep Nesting",
+                description="Code with multiple levels of nested conditionals or loops",
+                pattern=r"(?:if|for|while).*\n(?:\s+(?:if|for|while).*\n){3,}",
+                severity="medium",
+                tags=["nesting", "complexity", "readability"],
+            ),
+            KnowledgeEntry(
+                id="cp006",
+                category="best_practice",
+                title="Context Manager",
+                description="Use context managers for resource management (files, connections)",
+                example="with open('file.txt') as f:\n    data = f.read()",
+                tags=["context-manager", "resource-management", "python"],
+            ),
+            KnowledgeEntry(
+                id="cp007",
+                category="anti_pattern",
+                title="Long Function",
+                description="Functions that are too long and do too many things",
+                severity="medium",
+                tags=["long-function", "srp", "maintainability"],
+            ),
+            KnowledgeEntry(
+                id="cp008",
+                category="best_practice",
+                title="Type Hints",
+                description="Use type hints for better code documentation and IDE support",
+                example="def greet(name: str) -> str:\n    return f'Hello, {name}'",
+                tags=["type-hints", "typing", "documentation", "python"],
+            ),
+            KnowledgeEntry(
+                id="cp009",
+                category="anti_pattern",
+                title="Hardcoded Configuration",
+                description="Configuration values hardcoded instead of using environment variables or config files",
+                pattern=r"(?:host|port|password|key|secret)\s*=\s*['\"][^'\"]+['\"]",
+                severity="high",
+                tags=["hardcoded", "configuration", "security"],
+            ),
+            KnowledgeEntry(
+                id="cp010",
+                category="best_practice",
+                title="Dependency Injection",
+                description="Pass dependencies to a class rather than creating them internally",
+                example="class Service:\n    def __init__(self, repository: Repository):\n        self.repository = repository",
+                tags=["dependency-injection", "testability", "design-pattern"],
+            ),
+        ]

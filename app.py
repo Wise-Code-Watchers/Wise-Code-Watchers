@@ -4,14 +4,14 @@ import logging
 import json
 import os
 from flask import Flask, request, jsonify
-from config import Config
-from core.github_client import GitHubClient
-from core.git_client import GitClient
-from export.pr_exporter import PRExporter
-from publish.github_publisher import GitHubPublisher
+from src.config import Config
+from src.core.github_client import GitHubClient
+from src.core.git_client import GitClient
+from src.export.pr_exporter import PRExporter
+from src.publish.github_publisher import GitHubPublisher
 
 from langchain_openai import ChatOpenAI
-from agents.vulnerability.src import WiseCodeWatchersWorkflow
+from src.agents.vulnerability.src import WiseCodeWatchersWorkflow
 
 logging.basicConfig(
     level=logging.INFO,
@@ -126,20 +126,32 @@ def handle_pull_request(payload: dict):
         total_issues = logic_issues + security_issues
         
         logger.info(f"Comprehensive review complete. Found {total_issues} issues (logic: {logic_issues}, security: {security_issues})")
-        
+
         # Save comprehensive report to pr_folder
         report_path = os.path.join(pr_folder, "out", "comprehensive_report.json")
         os.makedirs(os.path.dirname(report_path), exist_ok=True)
         with open(report_path, "w", encoding="utf-8") as f:
             json.dump(final_report, f, ensure_ascii=False, indent=2)
         logger.info(f"Saved comprehensive report to {report_path}")
-        
-        # Publish to GitHub
+
+        # Load diff_ir for inline comments
+        diff_ir_path = os.path.join(pr_folder, "out", "diff_ir.json")
+        diff_ir = None
+        if os.path.exists(diff_ir_path):
+            try:
+                with open(diff_ir_path, "r", encoding="utf-8") as f:
+                    diff_ir = json.load(f)
+                logger.info(f"Loaded diff_ir from {diff_ir_path}")
+            except Exception as e:
+                logger.warning(f"Failed to load diff_ir.json: {e}")
+
+        # Publish to GitHub with inline comments
         publisher = GitHubPublisher(client)
         publish_result = publisher.publish_comprehensive_report(
             final_report=final_report,
             pr_number=pr_number,
             repo_full_name=repo_full_name,
+            diff_ir=diff_ir,  # Pass diff_ir for inline comments
         )
         logger.info(f"Published comprehensive review: {publish_result}")
 
