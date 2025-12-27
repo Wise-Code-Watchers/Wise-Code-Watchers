@@ -28,24 +28,17 @@ httpx>=0.24.0
 
 # Async Support
 aiohttp>=3.9.0
-asyncio>=3.4.3
 
-# Code Analysis & Parsing
-ast>=3.9.0
+# Code Analysis & Security Tools
+semgrep>=1.45.0
+bandit>=1.7.5
 
 # Utilities
 python-dateutil>=2.8.0
 
-# Optional: Advanced static analysis (Semgrep - install separately)
-# semgrep>=1.45.0
-
-# Optional: Security scanning tools
-# bandit>=1.7.5
-# safety>=2.3.0
-
-# Development Dependencies (uncomment for development)
-# pytest>=7.4.0
-# pytest-asyncio>=0.21.0
-# black>=23.0.0
-# ruff>=0.1.0
-# mypy>=1.5.0
+# Development Dependencies
+pytest>=7.4.0
+pytest-asyncio>=0.21.0
+black>=23.0.0
+ruff>=0.1.0
+mypy>=1.5.0

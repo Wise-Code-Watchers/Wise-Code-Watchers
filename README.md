@@ -15,22 +15,22 @@
 
 ---
 
-## 📖 项目简介
+## 📖 Project Overview
 
-**Wise Code Watchers** 是一个基于 LangGraph 多 Agent 架构的智能代码审查系统，以 GitHub App 的形式运行，自动对 Pull Request 进行深度代码审查。系统能够自动检测逻辑缺陷、安全漏洞，并将审查结果以行内评论的形式发布到 GitHub PR 中。
+**Wise Code Watchers** is an intelligent code review system built on LangGraph's multi-agent architecture. Running as a GitHub App, it automatically performs in-depth code reviews on Pull Requests. The system detects logic defects and security vulnerabilities, publishing review results as inline comments directly in GitHub PRs.
 
-### ✨ 核心特性
+### ✨ Key Features
 
-- 🤖 **多 Agent 协作架构**：基于 LangGraph 的工作流引擎，多个专业 Agent 并行协作
-- 🔒 **安全漏洞检测**：专业的 Security Agent 结合 Semgrep 规则检测安全漏洞
-- 🧠 **逻辑缺陷分析**：Logic Agent 深度分析代码逻辑，发现潜在 Bug
-- 📊 **智能风险评估**：AI 驱动的风险评分系统，优先审查高风险代码
-- 🔗 **跨文件分析**：分析代码变更的跨文件影响
-- 💬 **GitHub 深度集成**：自动发布行内评论到 PR，支持 GitHub App Webhook
+- 🤖 **Multi-Agent Collaboration Architecture**: LangGraph-based workflow engine with multiple specialized agents working in parallel
+- 🔒 **Security Vulnerability Detection**: Professional Security Agent combined with Semgrep rules to detect security vulnerabilities
+- 🧠 **Logic Defect Analysis**: Logic Agent performs deep analysis of code logic to uncover potential bugs
+- 📊 **Intelligent Risk Assessment**: AI-driven risk scoring system prioritizes high-risk code for review
+- 🔗 **Cross-File Analysis**: Analyzes the cross-file impact of code changes
+- 💬 **Deep GitHub Integration**: Automatically posts inline comments to PRs with GitHub App Webhook support
 
 ---
 
-## 🏗️ 系统架构
+## 🏗️ System Architecture
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────────┐
@@ -54,7 +54,7 @@
 │  │                    ▼                     ▼                               │  │
 │  │            ┌──────────────┐      ┌──────────────┐                       │  │
 │  │            │ Logic Agent  │      │Security Agent│                       │  │
-│  │            │  (缺陷检测)  │      │  (漏洞检测)  │                       │  │
+│  │            │(Logic Review)│      │(Security Review)                     │  │
 │  │            └──────────────┘      └──────────────┘                       │  │
 │  │                    │                      │                               │  │
 │  │                    └──────────┬───────────┘                               │  │
@@ -74,97 +74,97 @@
 
 ---
 
-## 📁 项目结构
+## 📁 Project Structure
 
 ```
 wise-code-watchers/
-├── app.py                      # 🚀 主应用入口 (Flask Webhook Server)
-├── config.py                   # ⚙️ 配置管理
-├── requirements.txt            # 📦 Python 依赖
-├── Dockerfile                  # 🐳 Docker 镜像配置
-├── docker-compose.yml          # 🐳 Docker Compose 配置
+├── app.py                      # 🚀 Main entry point (Flask Webhook Server)
+├── config.py                   # ⚙️ Configuration management
+├── requirements.txt            # 📦 Python dependencies
+├── Dockerfile                  # 🐳 Docker image configuration
+├── docker-compose.yml          # 🐳 Docker Compose configuration
 │
-├── core/                       # 🔧 核心模块
-│   ├── github_client.py        # GitHub API 客户端
-│   ├── git_client.py           # Git 操作客户端
-│   └── repo_manager.py         # 仓库管理器
+├── core/                       # 🔧 Core modules
+│   ├── github_client.py        # GitHub API client
+│   ├── git_client.py           # Git operations client
+│   └── repo_manager.py         # Repository manager
 │
-├── agents/                     # 🤖 Agent 模块
-│   ├── base.py                 # Agent 基类
-│   ├── aggregator.py           # 结果聚合器
-│   ├── orchestrator.py         # Agent 编排器
-│   ├── issue_scoring_filter.py # Issue 评分过滤器
+├── agents/                     # 🤖 Agent modules
+│   ├── base.py                 # Agent base class
+│   ├── aggregator.py           # Result aggregator
+│   ├── orchestrator.py         # Agent orchestrator
+│   ├── issue_scoring_filter.py # Issue scoring filter
 │   │
-│   ├── preprocessing/          # 预处理模块
-│   │   ├── diff_parser.py      # Diff 解析器
-│   │   ├── description_analyzer.py # PR 描述分析
-│   │   └── feature_divider.py  # 功能特性分割
+│   ├── preprocessing/          # Preprocessing modules
+│   │   ├── diff_parser.py      # Diff parser
+│   │   ├── description_analyzer.py # PR description analyzer
+│   │   └── feature_divider.py  # Feature divider
 │   │
-│   ├── syntax/                 # 语法分析模块
+│   ├── syntax/                 # Syntax analysis modules
 │   │   ├── syntax_analysis_agent.py
 │   │   ├── syntax_checker.py
 │   │   ├── structure_agent.py
 │   │   ├── memory_agent.py
-│   │   └── prompts/            # 提示词模板
+│   │   └── prompts/            # Prompt templates
 │   │
-│   └── vulnerability/          # 🔒 漏洞检测模块 (核心)
-│       ├── logic_agent.py      # 逻辑缺陷 Agent
-│       ├── security_agent.py   # 安全漏洞 Agent
+│   └── vulnerability/          # 🔒 Vulnerability detection module (core)
+│       ├── logic_agent.py      # Logic defect agent
+│       ├── security_agent.py   # Security vulnerability agent
 │       └── src/
-│           ├── main_workflow.py    # 🌟 LangGraph 主工作流
+│           ├── main_workflow.py    # 🌟 LangGraph main workflow
 │           ├── agents/
-│           │   ├── logic_agent.py    # 增强版逻辑 Agent
-│           │   ├── security_agent.py # 增强版安全 Agent
-│           │   └── triage_agent.py   # 分类预筛 Agent
-│           ├── analysis/           # 分析引擎
-│           │   ├── risk_analyzer.py     # 风险分析
-│           │   ├── cross_file_analyzer.py # 跨文件分析
-│           │   ├── impact_analyzer.py   # 影响分析
-│           │   └── security_validator.py # 安全验证
-│           ├── prompts/            # LLM 提示词
-│           ├── scripts/            # 辅助脚本
-│           │   ├── scanning/       # 扫描工具
-│           │   ├── parsing/        # 解析工具
-│           │   └── todolist/       # TODO 列表生成
-│           ├── mcpTools/           # MCP 工具集成
-│           └── semgrep_rules/      # Semgrep 规则模板
+│           │   ├── logic_agent.py    # Enhanced logic agent
+│           │   ├── security_agent.py # Enhanced security agent
+│           │   └── triage_agent.py   # Triage agent
+│           ├── analysis/           # Analysis engines
+│           │   ├── risk_analyzer.py     # Risk analyzer
+│           │   ├── cross_file_analyzer.py # Cross-file analyzer
+│           │   ├── impact_analyzer.py   # Impact analyzer
+│           │   └── security_validator.py # Security validator
+│           ├── prompts/            # LLM prompts
+│           ├── scripts/            # Utility scripts
+│           │   ├── scanning/       # Scanning tools
+│           │   ├── parsing/        # Parsing tools
+│           │   └── todolist/       # TODO list generation
+│           ├── mcpTools/           # MCP tools integration
+│           └── semgrep_rules/      # Semgrep rule templates
 │
-├── tools/                      # 🛠️ 外部工具集成
-│   ├── base.py                 # 工具基类
-│   ├── linter.py               # 多语言 Linter
-│   ├── security_scanner.py     # 安全扫描器
-│   └── static_analyzer.py      # 静态分析器
+├── tools/                      # 🛠️ External tools integration
+│   ├── base.py                 # Tool base class
+│   ├── linter.py               # Multi-language Linter
+│   ├── security_scanner.py     # Security scanner
+│   └── static_analyzer.py      # Static analyzer
 │
-├── knowledge/                  # 📚 知识库
-│   ├── base.py                 # 知识库基类
-│   ├── vulnerability_kb.py     # 漏洞知识库
-│   ├── code_patterns_kb.py     # 代码模式库
-│   └── best_practices_kb.py    # 最佳实践库
+├── knowledge/                  # 📚 Knowledge base
+│   ├── base.py                 # Knowledge base base class
+│   ├── vulnerability_kb.py     # Vulnerability knowledge base
+│   ├── code_patterns_kb.py     # Code patterns knowledge base
+│   └── best_practices_kb.py    # Best practices knowledge base
 │
-├── output/                     # 📊 输出模块
-│   ├── models.py               # 数据模型
-│   └── report_generator.py     # 报告生成器
+├── output/                     # 📊 Output modules
+│   ├── models.py               # Data models
+│   └── report_generator.py     # Report generator
 │
-├── export/                     # 📤 导出模块
-│   └── pr_exporter.py          # PR 数据导出
+├── export/                     # 📤 Export modules
+│   └── pr_exporter.py          # PR data exporter
 │
-├── publish/                    # 📢 发布模块
-│   └── github_publisher.py     # GitHub 评论发布
+├── publish/                    # 📢 Publishing modules
+│   └── github_publisher.py     # GitHub comment publisher
 │
-├── dev/                        # 🧪 开发/测试
-│   ├── architecture.md         # 架构文档
-│   ├── test_workflow.py        # 工作流测试
-│   └── test_hybrid_agent.py    # Agent 测试
+├── dev/                        # 🧪 Development/Testing
+│   ├── architecture.md         # Architecture documentation
+│   ├── test_workflow.py        # Workflow testing
+│   └── test_hybrid_agent.py    # Agent testing
 │
-└── docs/                       # 📖 文档
-    └── linter-installation.md  # Linter 安装指南
+└── docs/                       # 📖 Documentation
+    └── linter-installation.md  # Linter installation guide
 ```
 
 ---
 
-## 🔄 工作流程
+## 🔄 Workflow
 
-### 完整审查流程
+### Complete Review Process
 
 ```mermaid
 sequenceDiagram
@@ -180,131 +180,131 @@ sequenceDiagram
     WH->>EXP: Export PR Data
     EXP->>GH: Fetch metadata, diff, commits
     EXP->>WF: Start Workflow
-    
-    WF->>WF: 1. Data Parsing (解析 diff)
-    WF->>WF: 2. Risk Analysis (AI 风险评估)
-    WF->>WF: 3. Build Audit Units (构建审计单元)
-    
+
+    WF->>WF: 1. Data Parsing (parse diff)
+    WF->>WF: 2. Risk Analysis (AI risk assessment)
+    WF->>WF: 3. Build Audit Units (build audit units)
+
     par Parallel Agent Analysis
         WF->>LA: Logic Review
-        LA->>LA: 分析逻辑缺陷
+        LA->>LA: Analyze logic defects
         LA-->>WF: Logic Issues
     and
         WF->>SA: Security Review
-        SA->>SA: 分析安全漏洞
+        SA->>SA: Analyze security vulnerabilities
         SA-->>WF: Security Issues
     end
-    
+
     WF->>WF: 4. Generate Report
     WF->>PUB: Publish Results
     PUB->>GH: Create PR Review + Inline Comments
     GH-->>PUB: Review Created
 ```
 
-### 工作流节点详解
+### Workflow Node Details
 
-| 节点                    | 功能                                 | 输入                    | 输出              |
-| ----------------------- | ------------------------------------ | ----------------------- | ----------------- |
-| **Initialization**      | 初始化审计单元，过滤不需要审查的代码 | PR 目录                 | 审计单元列表      |
-| **Data Parsing**        | 解析 PR 元数据和 diff                | PR 文件夹               | diff_ir, pr_data  |
-| **Risk Analysis**       | AI 驱动的风险评估                    | diff_ir                 | feature_risk_plan |
-| **Semgrep Scanning**    | 运行安全扫描规则                     | 代码库                  | semgrep_results   |
-| **Logic Agent**         | 检测逻辑缺陷                         | 审计单元                | logic_review      |
-| **Security Agent**      | 检测安全漏洞                         | 审计单元 + Semgrep 证据 | security_review   |
-| **Cross-File Analysis** | 分析跨文件影响                       | 所有分析结果            | cross_file_impact |
-| **Report Generation**   | 生成最终报告                         | 所有分析结果            | final_report      |
+| Node                   | Function                              | Input                    | Output            |
+| ---------------------- | ------------------------------------- | ----------------------- | ----------------- |
+| **Initialization**     | Initialize audit units, filter code   | PR directory            | Audit unit list   |
+| **Data Parsing**       | Parse PR metadata and diff            | PR folder               | diff_ir, pr_data  |
+| **Risk Analysis**      | AI-driven risk assessment             | diff_ir                 | feature_risk_plan |
+| **Semgrep Scanning**   | Run security scanning rules           | Codebase                | semgrep_results   |
+| **Logic Agent**        | Detect logic defects                  | Audit unit              | logic_review      |
+| **Security Agent**     | Detect security vulnerabilities       | Audit unit + Semgrep evidence | security_review   |
+| **Cross-File Analysis**| Analyze cross-file impact             | All analysis results    | cross_file_impact |
+| **Report Generation**  | Generate final report                 | All analysis results    | final_report      |
 
 ---
 
-## 🚀 快速开始
+## 🚀 Quick Start
 
-### 环境要求
+### Requirements
 
 - Python 3.12+
-- Docker (推荐)
-- GitHub App 配置
+- Docker (recommended)
+- GitHub App configuration
 
-### 1. 克隆项目
+### 1. Clone the Project
 
 ```bash
 git clone https://github.com/your-org/wise-code-watchers.git
 cd wise-code-watchers
 ```
 
-### 2. 安装依赖
+### 2. Install Dependencies
 
 ```bash
-# 创建虚拟环境
+# Create virtual environment
 python -m venv venv
 source venv/bin/activate  # Linux/macOS
 # venv\Scripts\activate  # Windows
 
-# 安装依赖
+# Install dependencies
 pip install -r requirements.txt
 ```
 
-### 3. 配置环境变量
+### 3. Configure Environment Variables
 
-创建 `.env` 文件：
+Create a `.env` file:
 
 ```bash
-# GitHub App 配置
+# GitHub App Configuration
 GITHUB_APP_ID=your_app_id
 GITHUB_PRIVATE_KEY_PATH=/path/to/private-key.pem
 GITHUB_WEBHOOK_SECRET=your_webhook_secret
 
-# LLM 配置
+# LLM Configuration
 OPENAI_API_KEY=your_openai_api_key
-# 或使用兼容 OpenAI 的 API
+# Or use OpenAI-compatible API
 LLM_BASE_URL=https://api.example.com/v1
 LLM_MODEL=gpt-4
 
-# 服务配置
+# Service Configuration
 PORT=3000
 
-# 可选：漏洞检测阈值
+# Optional: Vulnerability detection thresholds
 VULN_RISK_THRESHOLD_LOGIC=60
 VULN_RISK_THRESHOLD_SECURITY=35
 VULN_MAX_UNITS_LOGIC=12
 VULN_MAX_UNITS_SECURITY=10
 ```
 
-### 4. 运行服务
+### 4. Run the Service
 
 ```bash
-# 直接运行
+# Run directly
 python app.py
 
+# Or with Docker
+docker-compose up -d
 ```
-
-
 
 ---
 
-## ⚙️ 配置说明
+## ⚙️ Configuration
 
-### 环境变量
+### Environment Variables
 
-| 变量名                         | 必需 | 默认值    | 说明                    |
-| ------------------------------ | ---- | --------- | ----------------------- |
-| `GITHUB_APP_ID`                | ✅    | -         | GitHub App ID           |
-| `GITHUB_PRIVATE_KEY_PATH`      | ✅    | -         | 私钥文件路径            |
-| `GITHUB_WEBHOOK_SECRET`        | ✅    | -         | Webhook 密钥            |
-| `OPENAI_API_KEY`               | ⚠️    | -         | OpenAI API Key          |
-| `LLM_BASE_URL`                 | ❌    | -         | 兼容 OpenAI 的 API 地址 |
-| `LLM_MODEL`                    | ❌    | `GLM-4.6` | 模型名称                |
-| `PORT`                         | ❌    | `3000`    | 服务端口                |
-| `VULN_RISK_THRESHOLD_LOGIC`    | ❌    | `60`      | 逻辑审查风险阈值        |
-| `VULN_RISK_THRESHOLD_SECURITY` | ❌    | `35`      | 安全审查风险阈值        |
+| Variable Name                | Required | Default  | Description                          |
+| ---------------------------- | -------- | -------- | ------------------------------------ |
+| `GITHUB_APP_ID`              | ✅        | -        | GitHub App ID                        |
+| `GITHUB_PRIVATE_KEY_PATH`    | ✅        | -        | Private key file path                |
+| `GITHUB_WEBHOOK_SECRET`      | ✅        | -        | Webhook secret                        |
+| `OPENAI_API_KEY`             | ⚠️        | -        | OpenAI API Key                        |
+| `LLM_BASE_URL`               | ❌        | -        | OpenAI-compatible API endpoint       |
+| `LLM_MODEL`                  | ❌        | `GLM-4.6`| Model name                            |
+| `PORT`                       | ❌        | `3000`   | Service port                          |
+| `VULN_RISK_THRESHOLD_LOGIC`  | ❌        | `60`     | Logic review risk threshold           |
+| `VULN_RISK_THRESHOLD_SECURITY`| ❌        | `35`     | Security review risk threshold        |
 
-### GitHub App 配置
+### GitHub App Configuration
 
-1. 创建 GitHub App：
-   - Homepage URL: 你的服务地址
+1. Create a GitHub App:
+   - Homepage URL: Your service address
    - Webhook URL: `https://your-domain.com/webhook`
-   - Webhook Secret: 自定义密钥
+   - Webhook Secret: Custom secret
 
-2. 权限配置：
+2. Permission Configuration:
    - **Repository permissions**:
      - Contents: Read
      - Pull requests: Read and write
@@ -312,107 +312,107 @@ python app.py
    - **Subscribe to events**:
      - Pull request
 
-3. 生成并下载私钥文件
+3. Generate and download the private key file
 
 ---
 
-## 🔌 API 端点
+## 🔌 API Endpoints
 
-### Webhook 端点
+### Webhook Endpoint
 
 ```
 POST /webhook
 ```
 
-接收 GitHub Webhook 事件。支持的事件：
+Receives GitHub Webhook events. Supported events:
 
-- `ping`: 健康检查
-- `pull_request`: PR 事件 (opened, synchronize, reopened)
+- `ping`: Health check
+- `pull_request`: PR events (opened, synchronize, reopened)
 
-### 健康检查
+### Health Check
 
 ```
 GET /health
 ```
 
-返回服务状态。
+Returns service status.
 
 ---
 
-## 🤖 Agent 详解
+## 🤖 Agents Details
 
 ### Logic Agent
 
-**职责**：检测由 PR diff 引入或修改导致的逻辑错误
+**Responsibility**: Detect logic errors introduced or modified by PR diff
 
-**检测类型**：
+**Detection Types**:
 
-- 边界条件错误
-- 空值/空指针处理
-- 资源泄漏
-- 并发问题
-- 算法错误
+- Boundary condition errors
+- Null/null pointer handling
+- Resource leaks
+- Concurrency issues
+- Algorithm errors
 
 ### Security Agent
 
-**职责**：基于工具证据检测安全漏洞
+**Responsibility**: Detect security vulnerabilities based on tool evidence
 
-**检测类型**：
+**Detection Types**:
 
-- SQL 注入 (SQLi)
-- 命令注入 (RCE)
-- 服务端请求伪造 (SSRF)
-- 跨站脚本 (XSS)
-- 不安全的反序列化
-- 敏感信息泄露
-- 认证/授权缺陷
+- SQL Injection (SQLi)
+- Command Injection (RCE)
+- Server-Side Request Forgery (SSRF)
+- Cross-Site Scripting (XSS)
+- Insecure Deserialization
+- Sensitive Information Leakage
+- Authentication/Authorization Flaws
 
-**证据先行机制**：
+**Evidence-First Mechanism**:
 
-1. `entrypoint_evidence`: 外部输入来源
-2. `call_chain_evidence`: 调用链分析
-3. `framework_evidence`: 框架自动暴露
-4. `context_evidence`: 上下文关联
+1. `entrypoint_evidence`: External input sources
+2. `call_chain_evidence`: Call chain analysis
+3. `framework_evidence`: Framework auto-exposure
+4. `context_evidence`: Contextual associations
 
 ### Triage Agent
 
-**职责**：快速预筛选，确定审查优先级
+**Responsibility**: Fast pre-screening to determine review priority
 
-**优先级**：
+**Priorities**:
 
-- P0: 紧急 (高风险安全问题)
-- P1: 高 (重要逻辑问题)
-- P2: 中 (一般问题)
-- P3: 低 (轻微问题)
-- SKIP: 跳过 (测试/文档等)
-
----
-
-## 🔧 工具集成
-
-### Linter 集成
-
-支持的 Linter：
-
-| 语言                  | 工具                 | 检测能力                        |
-| --------------------- | -------------------- | -------------------------------|
-| Python                | Ruff                 | 代码风格、资源管理、类型检查     |
-| JavaScript/TypeScript | ESLint               | 语法错误、未使用变量、Hook 依赖  |
-| Go                    | golangci-lint        | 资源关闭、SQL 检查、安全问题     |
-| Ruby                  | RuboCop              | 代码风格、资源管理               |
-| Java                  | Checkstyle, SpotBugs | 代码风格、Bug 检测              |
-
-### 安全扫描器
-
-- **Bandit**: Python 安全扫描
-- **模式匹配扫描**: 通用安全模式检测
-- **Semgrep**: 自定义规则扫描
+- P0: Urgent (high-risk security issues)
+- P1: High (important logic issues)
+- P2: Medium (general issues)
+- P3: Low (minor issues)
+- SKIP: Skip (tests/docs, etc.)
 
 ---
 
-## 📊 输出报告
+## 🔧 Tools Integration
 
-### 报告结构
+### Linter Integration
+
+Supported Linters:
+
+| Language              | Tool                 | Detection Capabilities                      |
+| --------------------- | -------------------- | ------------------------------------------- |
+| Python                | Ruff                 | Code style, resource management, type check |
+| JavaScript/TypeScript | ESLint               | Syntax errors, unused variables, Hook deps  |
+| Go                    | golangci-lint        | Resource cleanup, SQL checks, security      |
+| Ruby                  | RuboCop              | Code style, resource management             |
+| Java                  | Checkstyle, SpotBugs | Code style, Bug detection                   |
+
+### Security Scanners
+
+- **Bandit**: Python security scanning
+- **Pattern Matching**: Generic security pattern detection
+- **Semgrep**: Custom rule scanning
+
+---
+
+## 📊 Output Reports
+
+### Report Structure
 
 ```json
 {
@@ -423,7 +423,7 @@ GET /health
         "result": "ISSUE",
         "issues": [
           {
-            "title": "空指针解引用风险",
+            "title": "Null Pointer Dereference Risk",
             "severity": "high",
             "location": {
               "file": "src/main.py",
@@ -446,59 +446,59 @@ GET /health
 }
 ```
 
-### GitHub 评论示例
+### GitHub Comment Example
 
-系统会自动在 PR 中发布：
+The system automatically posts to PRs:
 
-- **总结评论**：包含整体审查结果
-- **行内评论**：在具体问题代码行添加评论
+- **Summary Comment**: Contains overall review results
+- **Inline Comments**: Adds comments at specific problematic code lines
 
 ---
 
-## 🧪 开发与测试
+## 🧪 Development & Testing
 
-### 运行测试
+### Running Tests
 
 ```bash
-# 工作流测试
+# Workflow test
 python dev/test_workflow.py
 
-# Agent 测试
+# Agent test
 python dev/test_hybrid_agent.py
 ```
 
-### 本地调试
+### Local Debugging
 
 ```bash
-# 启用详细日志
+# Enable detailed logging
 export ENABLE_DETAILED_LOGS=true
 python app.py
 ```
 
 ---
 
-## 🤝 贡献指南
+## 🤝 Contributing
 
-1. Fork 本仓库
-2. 创建特性分支：`git checkout -b feature/AmazingFeature`
-3. 提交更改：`git commit -m 'Add some AmazingFeature'`
-4. 推送分支：`git push origin feature/AmazingFeature`
-5. 提交 Pull Request
-
----
-
-## 📄 许可证
-
-本项目采用 MIT 许可证 - 详见 [LICENSE](LICENSE) 文件
+1. Fork this repository
+2. Create a feature branch: `git checkout -b feature/AmazingFeature`
+3. Commit changes: `git commit -m 'Add some AmazingFeature'`
+4. Push to branch: `git push origin feature/AmazingFeature`
+5. Submit a Pull Request
 
 ---
 
-## 🙏 致谢
+## 📄 License
 
-- [LangChain](https://github.com/langchain-ai/langchain) - LLM 应用框架
-- [LangGraph](https://github.com/langchain-ai/langgraph) - 多 Agent 工作流
-- [Semgrep](https://github.com/semgrep/semgrep) - 代码扫描引擎
-- [PyGithub](https://github.com/PyGithub/PyGithub) - GitHub API 客户端
+This project is licensed under the MIT License - see [LICENSE](LICENSE) file for details
+
+---
+
+## 🙏 Acknowledgments
+
+- [LangChain](https://github.com/langchain-ai/langchain) - LLM application framework
+- [LangGraph](https://github.com/langchain-ai/langgraph) - Multi-agent workflow
+- [Semgrep](https://github.com/semgrep/semgrep) - Code scanning engine
+- [PyGithub](https://github.com/PyGithub/PyGithub) - GitHub API client
 
 ---
 
@@ -506,3 +506,4 @@ python app.py
   <strong>Made with ❤️ by Wise Code Watchers Team</strong>
 </p>
 
+**[中文版 README](README_ZH.md)**

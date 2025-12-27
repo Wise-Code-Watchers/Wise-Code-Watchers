@@ -1,0 +1,60 @@
+version: '3.8'
+
+services:
+  wise-code-watchers:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: wise-code-watchers
+    ports:
+      - "3000:3000"
+    environment:
+      # GitHub App 配置
+      - GITHUB_APP_ID=${GITHUB_APP_ID}
+      - GITHUB_PRIVATE_KEY_PATH=/app/secret/private-key.pem
+      - GITHUB_WEBHOOK_SECRET=${GITHUB_WEBHOOK_SECRET}
+
+      # LLM 配置
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - BASE_URL=${BASE_URL}
+      - MODEL=${MODEL:-GLM-4.6}
+
+      # 服务配置
+      - PORT=3000
+      - ENABLE_DETAILED_LOGS=${ENABLE_DETAILED_LOGS:-false}
+
+      # 漏洞检测阈值
+      - VULN_RISK_THRESHOLD_LOGIC=${VULN_RISK_THRESHOLD_LOGIC:-60}
+      - VULN_RISK_THRESHOLD_SECURITY=${VULN_RISK_THRESHOLD_SECURITY:-35}
+      - VULN_MAX_UNITS_LOGIC=${VULN_MAX_UNITS_LOGIC:-12}
+      - VULN_MAX_UNITS_SECURITY=${VULN_MAX_UNITS_SECURITY:-10}
+    volumes:
+      # 挂载私钥文件
+      - ./secret:/app/secret:ro
+
+      # 持久化 PR 导出数据
+      - ./pr_export:/app/pr_export
+
+      # 持久化工作空间
+      - ./workspace:/app/workspace
+
+      # 持久化日志
+      - ./logs:/app/logs
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    networks:
+      - wise-code-watchers-network
+
+networks:
+  wise-code-watchers-network:
+    driver: bridge
+
+volumes:
+  pr_export:
+  workspace:
+  logs:

@@ -4,14 +4,14 @@ import logging
 import json
 import os
 from flask import Flask, request, jsonify
-from src.config import Config
-from src.core.github_client import GitHubClient
-from src.core.git_client import GitClient
-from src.export.pr_exporter import PRExporter
-from src.publish.github_publisher import GitHubPublisher
+from config import Config
+from core.github_client import GitHubClient
+from core.git_client import GitClient
+from export.pr_exporter import PRExporter
+from publish.github_publisher import GitHubPublisher
 
 from langchain_openai import ChatOpenAI
-from src.agents.vulnerability.src import WiseCodeWatchersWorkflow
+from agents.vulnerability.src import WiseCodeWatchersWorkflow
 
 logging.basicConfig(
     level=logging.INFO,
