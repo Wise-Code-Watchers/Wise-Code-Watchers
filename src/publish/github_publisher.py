@@ -356,41 +356,118 @@ def _find_line_in_pr_diff(
     return None
 
 
+def _generate_functional_summary_body(functional_summary: Dict[str, Any], pr_info: Dict[str, Any]) -> str:
+    """Generate GitHub comment body from functional summary."""
+    lines = ["## 📋 PR 功能分析总结\n"]
+
+    # Overview
+    overview = functional_summary.get("overview", "")
+    if overview:
+        lines.append(f"**概述:** {overview}\n")
+
+    # Key Changes
+    key_changes = functional_summary.get("key_changes", [])
+    if key_changes:
+        lines.append("### 🔑 核心变更\n")
+        for change in key_changes:
+            lines.append(f"- {change}")
+        lines.append("")
+
+    # Affected Components
+    components = functional_summary.get("affected_components", [])
+    if components:
+        lines.append("### 📦 影响组件\n")
+        for component in components:
+            lines.append(f"- `{component}`")
+        lines.append("")
+
+    # Change Categories
+    categories = functional_summary.get("change_categories", {})
+    if categories:
+        category_names = {
+            "feature": "✨ 新功能",
+            "bugfix": "🐛 缺陷修复",
+            "refactor": "♻️ 重构优化",
+            "performance": "⚡ 性能改进",
+            "documentation": "📝 文档更新",
+            "tests": "🧪 测试相关",
+            "config": "⚙️ 配置变更",
+            "other": "📦 其他变更"
+        }
+        lines.append("### 🏷️ 变更分类\n")
+        for category, items in categories.items():
+            if items:
+                name = category_names.get(category, category.capitalize())
+                lines.append(f"**{name}:**")
+                for item in items:
+                    lines.append(f"  - {item}")
+        lines.append("")
+
+    # Files Summary
+    files_summary = functional_summary.get("files_summary", {})
+    if files_summary:
+        lines.append("### 📁 文件统计\n")
+        lines.append(f"- **总计:** {files_summary.get('total_files', 0)} 个文件")
+        lines.append(f"  - 新增: {files_summary.get('added', 0)}")
+        lines.append(f"  - 修改: {files_summary.get('modified', 0)}")
+        lines.append(f"  - 删除: {files_summary.get('deleted', 0)}")
+        lines.append(f"  - 重命名: {files_summary.get('renamed', 0)}")
+        lines.append("")
+
+    # Complexity Assessment
+    complexity = functional_summary.get("complexity_assessment", "")
+    if complexity:
+        lines.append("### 📊 复杂度评估\n")
+        lines.append(f"{complexity}\n")
+
+    # Testing Suggestions
+    testing_suggestions = functional_summary.get("testing_suggestions", [])
+    if testing_suggestions:
+        lines.append("### 🧪 测试建议\n")
+        for suggestion in testing_suggestions:
+            lines.append(f"- {suggestion}")
+        lines.append("")
+
+    lines.append("---\n*由 WiseCodeWatchers 功能分析生成*")
+
+    return "\n".join(lines)
+
+
 def _generate_comprehensive_report_body(final_report: Dict[str, Any]) -> str:
     """Generate GitHub review body from comprehensive workflow report."""
     lines = ["## 🔍 WiseCodeWatchers Comprehensive Review\n"]
-    
+
     # PR Info
     pr_info = final_report.get("pr_info", {})
     if pr_info.get("title"):
         lines.append(f"**PR:** {pr_info.get('title', 'N/A')}")
         lines.append(f"**Changes:** +{pr_info.get('additions', 0)}/-{pr_info.get('deletions', 0)} lines\n")
-    
+
     # Summary Statistics
     logic_review = final_report.get("logic_review", {})
     security_review = final_report.get("security_review", {})
     triage_summary = final_report.get("triage_summary", {})
     cross_impact = final_report.get("cross_file_impact", {})
-    
+
     logic_issues = logic_review.get("issues_found", 0)
     security_issues = security_review.get("issues_found", 0)
     total_issues = logic_issues + security_issues
-    
+
     lines.append("### 📊 Summary\n")
     lines.append(f"| Metric | Value |")
     lines.append(f"|--------|-------|")
     lines.append(f"| Logic Issues | {logic_issues} |")
     lines.append(f"| Security Issues | {security_issues} |")
     lines.append(f"| **Total Issues** | **{total_issues}** |")
-    
+
     if triage_summary.get("total_count", 0) > 0:
         lines.append(f"| Hunks Reviewed | {triage_summary.get('to_review_count', 0)}/{triage_summary.get('total_count', 0)} |")
-    
+
     if cross_impact.get("files_analyzed", 0) > 0:
         lines.append(f"| High Impact Files | {len(cross_impact.get('high_impact_files', []))} |")
-    
+
     lines.append("")
-    
+
     # Logic Issues
     if logic_issues > 0:
         lines.append("### 🧠 Logic Issues\n")
@@ -409,7 +486,7 @@ def _generate_comprehensive_report_body(final_report: Dict[str, Any]) -> str:
         if logic_issues > 10:
             lines.append(f"\n*...and {logic_issues - 10} more logic issues*")
         lines.append("")
-    
+
     # Security Issues
     if security_issues > 0:
         lines.append("### 🔒 Security Issues\n")
@@ -428,7 +505,7 @@ def _generate_comprehensive_report_body(final_report: Dict[str, Any]) -> str:
         if security_issues > 10:
             lines.append(f"\n*...and {security_issues - 10} more security issues*")
         lines.append("")
-    
+
     # Cross-file impact warnings
     breaking_changes = cross_impact.get("breaking_changes", [])
     if breaking_changes:
@@ -436,7 +513,7 @@ def _generate_comprehensive_report_body(final_report: Dict[str, Any]) -> str:
         for change in breaking_changes[:5]:
             lines.append(f"- {change.get('description', 'Breaking change detected')}")
         lines.append("")
-    
+
     # Recommendation
     lines.append("### 🎯 Recommendation\n")
     review_summary = final_report.get("review_summary", {})
@@ -449,9 +526,9 @@ def _generate_comprehensive_report_body(final_report: Dict[str, Any]) -> str:
         lines.append("🟡 **Multiple logic issues found.** Consider reviewing before merging.")
     else:
         lines.append("🟢 Minor issues found. Review recommended.")
-    
+
     lines.append("\n---\n*Generated by WiseCodeWatchers Comprehensive Workflow*")
-    
+
     return "\n".join(lines)
 
 
@@ -715,4 +792,47 @@ class GitHubPublisher:
 
         except Exception as e:
             logger.error(f"Failed to publish comprehensive review: {e}")
+            raise
+
+    def publish_functional_summary(
+        self,
+        functional_summary: Dict[str, Any],
+        pr_number: int,
+        repo_full_name: str,
+        pr_metadata: Optional[Dict[str, Any]] = None,
+    ) -> dict:
+        """
+        Publish functional summary to GitHub as a PR comment.
+
+        Args:
+            functional_summary: The functional summary dictionary
+            pr_number: Pull request number
+            repo_full_name: Repository full name (e.g., "owner/repo")
+            pr_metadata: Optional PR metadata for additional context
+        """
+        try:
+            body = _generate_functional_summary_body(
+                functional_summary,
+                pr_metadata or {}
+            )
+
+            # Publish as an issue comment (not a review)
+            self.client.create_issue_comment(
+                repo_full_name=repo_full_name,
+                pr_number=pr_number,
+                body=body,
+            )
+
+            logger.info(f"Published functional summary for PR #{pr_number}")
+
+            return {
+                "type": "functional_summary",
+                "body_length": len(body),
+                "overview_length": len(functional_summary.get("overview", "")),
+                "key_changes_count": len(functional_summary.get("key_changes", [])),
+                "affected_components_count": len(functional_summary.get("affected_components", [])),
+            }
+
+        except Exception as e:
+            logger.error(f"Failed to publish functional summary: {e}")
             raise

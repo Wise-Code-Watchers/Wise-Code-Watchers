@@ -85,12 +85,26 @@ def handle_pull_request(payload: dict):
 
     try:
         client = GitHubClient(installation_id)
-        exporter = PRExporter(client)
+        llm = create_workflow_llm()
+        exporter = PRExporter(client, llm=llm)
         git_client = GitClient()
 
         logger.info(f"Exporting PR #{pr_number}")
-        pr_folder = exporter.export_pr_to_folder(repo_full_name, pr_number)
+        pr_folder, functional_summary = exporter.export_pr_to_folder(repo_full_name, pr_number)
         logger.info(f"Exported PR #{pr_number} to {pr_folder}")
+
+        # Publish functional summary if available
+        if functional_summary:
+            logger.info(f"Publishing functional summary for PR #{pr_number}")
+            publisher = GitHubPublisher(client)
+            pr_metadata = client.get_pr_metadata(repo_full_name, pr_number)
+            summary_result = publisher.publish_functional_summary(
+                functional_summary=functional_summary,
+                pr_number=pr_number,
+                repo_full_name=repo_full_name,
+                pr_metadata=pr_metadata,
+            )
+            logger.info(f"Published functional summary: {summary_result}")
 
         logger.info(f"Cloning {repo_full_name} branch {base_branch}")
         installation_token = client.get_access_token()
@@ -109,7 +123,6 @@ def handle_pull_request(payload: dict):
 
         # Run comprehensive WiseCodeWatchersWorkflow with LangGraph
         logger.info(f"Starting comprehensive workflow review for PR #{pr_number}")
-        llm = create_workflow_llm()
         workflow = WiseCodeWatchersWorkflow(llm=llm)
 
         final_report = workflow.run(

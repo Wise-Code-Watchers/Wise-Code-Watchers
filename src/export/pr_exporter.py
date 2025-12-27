@@ -1,13 +1,28 @@
 import os
 import json
+import logging
 from src.core.github_client import GitHubClient
+
+logger = logging.getLogger(__name__)
 
 
 class PRExporter:
-    def __init__(self, github_client: GitHubClient):
-        self.client = github_client
+    def __init__(self, github_client: GitHubClient, llm=None):
+        """Initialize PR exporter.
 
-    def export_pr_to_folder(self, repo_full_name: str, pr_number: int, base_output_dir: str = "pr_export") -> str:
+        Args:
+            github_client: GitHub client instance
+            llm: Optional LLM instance for generating functional summary
+        """
+        self.client = github_client
+        self.llm = llm
+
+    def export_pr_to_folder(self, repo_full_name: str, pr_number: int, base_output_dir: str = "pr_export") -> tuple:
+        """Export PR data to folder and optionally generate functional summary.
+
+        Returns:
+            tuple: (output_dir, functional_summary)
+        """
         owner, repo = repo_full_name.split("/")
         pr_folder = f"{owner}_{repo}_PR{pr_number}"
         output_dir = os.path.join(base_output_dir, pr_folder)
@@ -36,7 +51,21 @@ class PRExporter:
 
         self._export_commits_with_diffs(repo_full_name, commits, output_dir)
 
-        return output_dir
+        # Generate functional summary if LLM is provided
+        functional_summary = None
+        if self.llm:
+            try:
+                from src.agents.summary_agent import PRSummaryAgent
+                summary_agent = PRSummaryAgent(self.llm)
+                functional_summary = summary_agent.generate_summary(
+                    metadata, files_changed, commits, full_diff
+                )
+                self._save_json(output_dir, "functional_summary.json", functional_summary)
+                logger.info(f"Generated functional summary for PR #{pr_number}")
+            except Exception as e:
+                logger.error(f"Failed to generate functional summary: {e}", exc_info=True)
+
+        return output_dir, functional_summary
 
     def _export_commits_with_diffs(self, repo_full_name: str, commits: list, output_dir: str):
         commits_dir = os.path.join(output_dir, "commits")
