@@ -50,4 +50,5 @@ pr_export/
 
 secret/
 
-wcw_backup.tar.gz
+backup*
+workspace
