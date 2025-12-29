@@ -80,9 +80,15 @@
 wise-code-watchers/
 ├── app.py                      # 🚀 Main entry point (Flask Webhook Server)
 ├── config.py                   # ⚙️ Configuration management
+├── backup.py                   # 💾 Backup script
+├── scan_pr_with_templates.py   # 🔍 PR scanning script
 ├── requirements.txt            # 📦 Python dependencies
 ├── Dockerfile                  # 🐳 Docker image configuration
 ├── docker-compose.yml          # 🐳 Docker Compose configuration
+├── .env.example                # 🔐 Environment variables example
+├── linter-installation.md      # 📖 Linter installation guide
+├── CONTRIBUTING.md             # 🤝 Contributing guide
+├── CONTRIBUTORS.md             # 👥 Contributors list
 │
 ├── core/                       # 🔧 Core modules
 │   ├── github_client.py        # GitHub API client
@@ -90,10 +96,12 @@ wise-code-watchers/
 │   └── repo_manager.py         # Repository manager
 │
 ├── agents/                     # 🤖 Agent modules
+│   ├── __init__.py
 │   ├── base.py                 # Agent base class
 │   ├── aggregator.py           # Result aggregator
 │   ├── orchestrator.py         # Agent orchestrator
-│   ├── issue_scoring_filter.py # Issue scoring filter
+│   ├── issue_scoring_filter.py # Issue scoring filter (LLM 3D scoring)
+│   ├── summary_agent.py        # Summary agent
 │   │
 │   ├── preprocessing/          # Preprocessing modules
 │   │   ├── diff_parser.py      # Diff parser
@@ -101,38 +109,79 @@ wise-code-watchers/
 │   │   └── feature_divider.py  # Feature divider
 │   │
 │   ├── syntax/                 # Syntax analysis modules
-│   │   ├── syntax_analysis_agent.py
-│   │   ├── syntax_checker.py
-│   │   ├── structure_agent.py
-│   │   ├── memory_agent.py
-│   │   └── prompts/            # Prompt templates
+│   │   ├── syntax_analysis_agent.py  # Syntax analysis agent
+│   │   ├── syntax_checker.py         # Syntax checker
+│   │   ├── structure_agent.py        # Structure agent
+│   │   ├── memory_agent.py           # Memory agent
+│   │   ├── issue_filter.py           # Issue filter
+│   │   ├── core_rules.py             # Core rules
+│   │   ├── schemas.py                # Data schemas
+│   │   └── prompts/                  # Prompt templates
+│   │       ├── base.py
+│   │       ├── python_prompt.py
+│   │       ├── java_prompt.py
+│   │       ├── go_prompt.py
+│   │       ├── ruby_prompt.py
+│   │       └── typescript_prompt.py
 │   │
 │   └── vulnerability/          # 🔒 Vulnerability detection module (core)
-│       ├── logic_agent.py      # Logic defect agent
-│       ├── security_agent.py   # Security vulnerability agent
 │       └── src/
-│           ├── main_workflow.py    # 🌟 LangGraph main workflow
-│           ├── agents/
-│           │   ├── logic_agent.py    # Enhanced logic agent
-│           │   ├── security_agent.py # Enhanced security agent
-│           │   └── triage_agent.py   # Triage agent
-│           ├── analysis/           # Analysis engines
-│           │   ├── risk_analyzer.py     # Risk analyzer
+│           ├── main_workflow.py      # 🌟 LangGraph main workflow
+│           │
+│           ├── agents/               # Agent implementations
+│           │   ├── logic_agent.py    # Logic defect agent
+│           │   ├── security_agent.py # Security vulnerability agent
+│           │   └── triage_agent.py   # Triage pre-screening agent
+│           │
+│           ├── analysis/             # Analysis engines
+│           │   ├── risk_analyzer.py       # Risk analyzer
 │           │   ├── cross_file_analyzer.py # Cross-file analyzer
-│           │   ├── impact_analyzer.py   # Impact analyzer
-│           │   └── security_validator.py # Security validator
-│           ├── prompts/            # LLM prompts
-│           ├── scripts/            # Utility scripts
-│           │   ├── scanning/       # Scanning tools
-│           │   ├── parsing/        # Parsing tools
-│           │   └── todolist/       # TODO list generation
+│           │   ├── impact_analyzer.py     # Impact analyzer
+│           │   ├── security_validator.py  # Security validator
+│           │   └── hunk_index.py          # Hunk index
+│           │
+│           ├── scripts/             # Utility scripts
+│           │   ├── core/
+│           │   │   ├── code_tools.py       # Code tools
+│           │   │   ├── context_builder.py  # Context builder
+│           │   │   └── types.py            # Type definitions
+│           │   ├── parsing/
+│           │   │   ├── data_parser.py      # Data parser
+│           │   │   └── diff_slicer.py      # Diff slicer
+│           │   ├── scanning/
+│           │   │   ├── parallel_semgrep_scanner.py    # Parallel Semgrep scanner
+│           │   │   ├── template_semgrep_scanner.py    # Template Semgrep scanner
+│           │   │   ├── scan_task_planner.py           # Scan task planner
+│           │   │   └── security_tooling.py            # Security tooling
+│           │   ├── reporting/
+│           │   │   └── final_report_generator.py      # Final report generator
+│           │   ├── todolist/
+│           │   │   ├── todolist_generator.py          # TODO list generator
+│           │   │   └── todolist_executor.py           # TODO list executor
+│           │   ├── analysis/
+│           │   │   ├── initialization_engine.py       # Initialization engine
+│           │   │   └── vulnerability_analyzer.py      # Vulnerability analyzer
+│           │   └── smart_context_builder.py           # Smart context builder
+│           │
+│           ├── prompts/             # LLM prompts
+│           │   └── prompt.py
+│           │
 │           ├── mcpTools/           # MCP tools integration
-│           └── semgrep_rules/      # Semgrep rule templates
+│           │   └── mcpTools.py
+│           │
+│           └── semgrep_rules/      # Semgrep rule templates (36+ templates)
+│               └── templates/
+│                   ├── c_*.template.yaml              # C language rules
+│                   ├── go_*.template.yaml             # Go language rules
+│                   ├── java_*.template.yaml           # Java language rules
+│                   ├── py_*.template.yaml             # Python language rules
+│                   ├── rb_*.template.yaml             # Ruby language rules
+│                   └── ts_*.template.yaml             # TypeScript language rules
 │
 ├── tools/                      # 🛠️ External tools integration
 │   ├── base.py                 # Tool base class
-│   ├── linter.py               # Multi-language Linter
-│   ├── security_scanner.py     # Security scanner
+│   ├── linter.py               # Multi-language Linter (Ruff, ESLint, golangci-lint, etc.)
+│   ├── security_scanner.py     # Security scanner (Bandit, pattern matching)
 │   └── static_analyzer.py      # Static analyzer
 │
 ├── knowledge/                  # 📚 Knowledge base
@@ -146,18 +195,23 @@ wise-code-watchers/
 │   └── report_generator.py     # Report generator
 │
 ├── export/                     # 📤 Export modules
-│   └── pr_exporter.py          # PR data exporter
+│   └── pr_exporter.py          # PR data exporter (metadata, diff, commits)
 │
 ├── publish/                    # 📢 Publishing modules
-│   └── github_publisher.py     # GitHub comment publisher
+│   └── github_publisher.py     # GitHub comment/review publisher
 │
 ├── dev/                        # 🧪 Development/Testing
 │   ├── architecture.md         # Architecture documentation
 │   ├── test_workflow.py        # Workflow testing
 │   └── test_hybrid_agent.py    # Agent testing
 │
-└── docs/                       # 📖 Documentation
-    └── linter-installation.md  # Linter installation guide
+├── pr_export/                  # 📦 PR export data cache
+│   └── Wise-Code-Watchers_*_PR*/
+│
+├── workspace/                  # 💼 Workspace (repo clone directories)
+│   └── discourse-wcw/          # Example: Discourse project
+│
+└── secret/                     # 🔐 Secret storage
 ```
 
 ---
