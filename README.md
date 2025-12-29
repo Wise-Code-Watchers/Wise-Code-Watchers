@@ -353,6 +353,27 @@ Returns service status.
 - Concurrency issues
 - Algorithm errors
 
+**Semgrep Evidence Enhancement** 🆕:
+
+Logic Agent now supports Semgrep static analysis evidence enhancement, using the same evidence injection mechanism as Security Agent:
+
+1. **Evidence Matching**: Precise matching of Semgrep findings by file path and line number range
+2. **Prompt Enhancement**: Injects matched Semgrep findings into LLM prompts
+3. **Pattern Reference**: Static analysis results serve as code pattern references to assist logic defect detection
+4. **Parallel Execution**: Processes in parallel with Security Agent, both receiving Semgrep evidence
+
+**Data Flow**:
+
+```
+Semgrep Scan (all_evidence.json)
+    ↓
+Match evidence by feature block
+    ↓
+Inject into Logic Agent prompt
+    ↓
+Enhanced logic defect detection
+```
+
 ### Security Agent
 
 **Responsibility**: Detect security vulnerabilities based on tool evidence
@@ -385,6 +406,48 @@ Returns service status.
 - P2: Medium (general issues)
 - P3: Low (minor issues)
 - SKIP: Skip (tests/docs, etc.)
+
+### Issue Scoring Filter
+
+**Responsibility**: LLM-powered intelligent issue scoring and filtering system
+
+**Function**: Scores all issues from agents on three dimensions and applies intelligent filtering
+
+**Scoring Dimensions**:
+
+1. **Relevance (relevance_score)**: How related is the issue to PR changes (0.0-1.0)
+   - `1.0` = Directly in changed code, clearly introduced by this PR
+   - `0.7` = In a changed file, likely affected by the changes
+   - `0.4` = In related code, might be relevant
+   - `0.1` = In unchanged code, unrelated to PR
+
+2. **Severity (severity_score)**: How serious is this issue (0.0-1.0)
+   - `1.0` = Critical - security vulnerability, crash, data loss
+   - `0.8` = High - significant bug, logic error, resource leak
+   - `0.5` = Medium - should fix but not urgent
+   - `0.2` = Low - minor improvement, style issue
+
+3. **Confidence (confidence_score)**: How confident in this assessment (0.0-1.0)
+   - `1.0` = Very confident, clear evidence in the diff
+   - `0.5` = Moderately confident
+   - `0.2` = Uncertain, need more context
+
+**Filtering Rules**:
+
+- Must satisfy: `relevance >= 0.5` AND `severity >= 0.4` AND `confidence >= 0.3`
+- Special handling: Test file issues → Low relevance, Production code vulnerabilities → High severity
+
+**Workflow**:
+
+```
+All Issues from Agents
+    ↓
+LLM 3D Scoring (relevance/severity/confidence)
+    ↓
+Filter by Thresholds
+    ↓
+Output High-Quality Issues to GitHub
+```
 
 ---
 

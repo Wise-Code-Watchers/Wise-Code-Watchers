@@ -80,9 +80,15 @@
 wise-code-watchers/
 ├── app.py                      # 🚀 主应用入口 (Flask Webhook Server)
 ├── config.py                   # ⚙️ 配置管理
+├── backup.py                   # 💾 备份脚本
+├── scan_pr_with_templates.py   # 🔍 PR 扫描脚本
 ├── requirements.txt            # 📦 Python 依赖
 ├── Dockerfile                  # 🐳 Docker 镜像配置
 ├── docker-compose.yml          # 🐳 Docker Compose 配置
+├── .env.example                # 🔐 环境变量示例
+├── linter-installation.md      # 📖 Linter 安装指南
+├── CONTRIBUTING.md             # 🤝 贡献指南
+├── CONTRIBUTORS.md             # 👥 贡献者列表
 │
 ├── core/                       # 🔧 核心模块
 │   ├── github_client.py        # GitHub API 客户端
@@ -90,10 +96,12 @@ wise-code-watchers/
 │   └── repo_manager.py         # 仓库管理器
 │
 ├── agents/                     # 🤖 Agent 模块
+│   ├── __init__.py
 │   ├── base.py                 # Agent 基类
 │   ├── aggregator.py           # 结果聚合器
 │   ├── orchestrator.py         # Agent 编排器
-│   ├── issue_scoring_filter.py # Issue 评分过滤器
+│   ├── issue_scoring_filter.py # Issue 评分过滤器 (LLM 三维评分)
+│   ├── summary_agent.py        # 总结 Agent
 │   │
 │   ├── preprocessing/          # 预处理模块
 │   │   ├── diff_parser.py      # Diff 解析器
@@ -101,38 +109,79 @@ wise-code-watchers/
 │   │   └── feature_divider.py  # 功能特性分割
 │   │
 │   ├── syntax/                 # 语法分析模块
-│   │   ├── syntax_analysis_agent.py
-│   │   ├── syntax_checker.py
-│   │   ├── structure_agent.py
-│   │   ├── memory_agent.py
-│   │   └── prompts/            # 提示词模板
+│   │   ├── syntax_analysis_agent.py  # 语法分析 Agent
+│   │   ├── syntax_checker.py         # 语法检查器
+│   │   ├── structure_agent.py        # 结构分析 Agent
+│   │   ├── memory_agent.py           # 记忆 Agent
+│   │   ├── issue_filter.py           # Issue 过滤器
+│   │   ├── core_rules.py             # 核心规则
+│   │   ├── schemas.py                # 数据模式
+│   │   └── prompts/                  # 提示词模板
+│   │       ├── base.py
+│   │       ├── python_prompt.py
+│   │       ├── java_prompt.py
+│   │       ├── go_prompt.py
+│   │       ├── ruby_prompt.py
+│   │       └── typescript_prompt.py
 │   │
 │   └── vulnerability/          # 🔒 漏洞检测模块 (核心)
-│       ├── logic_agent.py      # 逻辑缺陷 Agent
-│       ├── security_agent.py   # 安全漏洞 Agent
 │       └── src/
-│           ├── main_workflow.py    # 🌟 LangGraph 主工作流
-│           ├── agents/
-│           │   ├── logic_agent.py    # 增强版逻辑 Agent
-│           │   ├── security_agent.py # 增强版安全 Agent
+│           ├── main_workflow.py      # 🌟 LangGraph 主工作流
+│           │
+│           ├── agents/               # Agent 实现
+│           │   ├── logic_agent.py    # 逻辑缺陷 Agent
+│           │   ├── security_agent.py # 安全漏洞 Agent
 │           │   └── triage_agent.py   # 分类预筛 Agent
-│           ├── analysis/           # 分析引擎
-│           │   ├── risk_analyzer.py     # 风险分析
+│           │
+│           ├── analysis/             # 分析引擎
+│           │   ├── risk_analyzer.py       # 风险分析
 │           │   ├── cross_file_analyzer.py # 跨文件分析
-│           │   ├── impact_analyzer.py   # 影响分析
-│           │   └── security_validator.py # 安全验证
-│           ├── prompts/            # LLM 提示词
-│           ├── scripts/            # 辅助脚本
-│           │   ├── scanning/       # 扫描工具
-│           │   ├── parsing/        # 解析工具
-│           │   └── todolist/       # TODO 列表生成
+│           │   ├── impact_analyzer.py     # 影响分析
+│           │   ├── security_validator.py  # 安全验证
+│           │   └── hunk_index.py          # Hunk 索引
+│           │
+│           ├── scripts/             # 辅助脚本
+│           │   ├── core/
+│           │   │   ├── code_tools.py       # 代码工具
+│           │   │   ├── context_builder.py  # 上下文构建
+│           │   │   └── types.py            # 类型定义
+│           │   ├── parsing/
+│           │   │   ├── data_parser.py      # 数据解析
+│           │   │   └── diff_slicer.py      # Diff 切片
+│           │   ├── scanning/
+│           │   │   ├── parallel_semgrep_scanner.py    # 并行 Semgrep 扫描
+│           │   │   ├── template_semgrep_scanner.py    # 模板 Semgrep 扫描
+│           │   │   ├── scan_task_planner.py           # 扫描任务规划
+│           │   │   └── security_tooling.py            # 安全工具
+│           │   ├── reporting/
+│           │   │   └── final_report_generator.py      # 最终报告生成
+│           │   ├── todolist/
+│           │   │   ├── todolist_generator.py          # TODO 列表生成
+│           │   │   └── todolist_executor.py           # TODO 列表执行
+│           │   ├── analysis/
+│           │   │   ├── initialization_engine.py       # 初始化引擎
+│           │   │   └── vulnerability_analyzer.py      # 漏洞分析
+│           │   └── smart_context_builder.py           # 智能上下文构建
+│           │
+│           ├── prompts/             # LLM 提示词
+│           │   └── prompt.py
+│           │
 │           ├── mcpTools/           # MCP 工具集成
-│           └── semgrep_rules/      # Semgrep 规则模板
+│           │   └── mcpTools.py
+│           │
+│           └── semgrep_rules/      # Semgrep 规则模板 (36+ 模板)
+│               └── templates/
+│                   ├── c_*.template.yaml              # C 语言规则
+│                   ├── go_*.template.yaml             # Go 语言规则
+│                   ├── java_*.template.yaml           # Java 语言规则
+│                   ├── py_*.template.yaml             # Python 语言规则
+│                   ├── rb_*.template.yaml             # Ruby 语言规则
+│                   └── ts_*.template.yaml             # TypeScript 语言规则
 │
 ├── tools/                      # 🛠️ 外部工具集成
 │   ├── base.py                 # 工具基类
-│   ├── linter.py               # 多语言 Linter
-│   ├── security_scanner.py     # 安全扫描器
+│   ├── linter.py               # 多语言 Linter (Ruff, ESLint, golangci-lint, etc.)
+│   ├── security_scanner.py     # 安全扫描器 (Bandit, 模式匹配)
 │   └── static_analyzer.py      # 静态分析器
 │
 ├── knowledge/                  # 📚 知识库
@@ -146,18 +195,23 @@ wise-code-watchers/
 │   └── report_generator.py     # 报告生成器
 │
 ├── export/                     # 📤 导出模块
-│   └── pr_exporter.py          # PR 数据导出
+│   └── pr_exporter.py          # PR 数据导出 (metadata, diff, commits)
 │
 ├── publish/                    # 📢 发布模块
-│   └── github_publisher.py     # GitHub 评论发布
+│   └── github_publisher.py     # GitHub 评论/Review 发布
 │
 ├── dev/                        # 🧪 开发/测试
 │   ├── architecture.md         # 架构文档
 │   ├── test_workflow.py        # 工作流测试
 │   └── test_hybrid_agent.py    # Agent 测试
 │
-└── docs/                       # 📖 文档
-    └── linter-installation.md  # Linter 安装指南
+├── pr_export/                  # 📦 PR 导出数据缓存
+│   └── Wise-Code-Watchers_*_PR*/
+│
+├── workspace/                  # 💼 工作区 (代码仓库克隆目录)
+│   └── discourse-wcw/          # 示例: Discourse 项目
+│
+└── secret/                     # 🔐 密钥存储
 ```
 
 ---
@@ -353,6 +407,27 @@ GET /health
 - 并发问题
 - 算法错误
 
+**Semgrep 证据增强** 🆕：
+
+Logic Agent 现在支持 Semgrep 静态分析证据增强，与 Security Agent 使用相同的证据注入机制：
+
+1. **证据匹配**：按文件路径和行号范围精确匹配 Semgrep 发现
+2. **提示词增强**：将匹配的 Semgrep 发现注入到 LLM 提示词中
+3. **模式参考**：静态分析结果作为代码模式参考，辅助逻辑缺陷检测
+4. **并行执行**：与 Security Agent 并行处理，同时接收 Semgrep 证据
+
+**数据流**：
+
+```
+Semgrep 扫描 (all_evidence.json)
+    ↓
+按功能块匹配证据
+    ↓
+注入 Logic Agent 提示词
+    ↓
+增强的逻辑缺陷检测
+```
+
 ### Security Agent
 
 **职责**：基于工具证据检测安全漏洞
@@ -385,6 +460,48 @@ GET /health
 - P2: 中 (一般问题)
 - P3: 低 (轻微问题)
 - SKIP: 跳过 (测试/文档等)
+
+### Issue Scoring Filter
+
+**职责**：基于 LLM 的智能问题评分和过滤系统
+
+**功能**：对所有 Agent 发现的问题进行三维评分和智能过滤
+
+**评分维度**：
+
+1. **相关性 (relevance_score)**: 问题与 PR 变更的关系 (0.0-1.0)
+   - `1.0` = 直接在变更代码中，由本次 PR 引入
+   - `0.7` = 在变更文件中，可能受影响
+   - `0.4` = 在相关代码中，可能有关联
+   - `0.1` = 在未变更代码中，与 PR 无关
+
+2. **严重性 (severity_score)**: 问题的严重程度 (0.0-1.0)
+   - `1.0` = 关键 - 安全漏洞、崩溃、数据丢失
+   - `0.8` = 高 - 重要 Bug、逻辑错误、资源泄漏
+   - `0.5` = 中 - 应该修复但不紧急
+   - `0.2` = 低 - 次要改进、风格问题
+
+3. **置信度 (confidence_score)**: 评估的可信度 (0.0-1.0)
+   - `1.0` = 非常确定，有明确证据
+   - `0.5` = 中等确定
+   - `0.2` = 不确定，需要更多上下文
+
+**过滤规则**：
+
+- 同时满足：`relevance >= 0.5` AND `severity >= 0.4` AND `confidence >= 0.3`
+- 特别处理：测试文件问题 → 低相关性，生产代码漏洞 → 高严重性
+
+**工作流程**：
+
+```
+所有 Agent 发现的问题
+    ↓
+LLM 三维评分 (相关性/严重性/置信度)
+    ↓
+根据阈值过滤
+    ↓
+输出高质量问题列表到 GitHub
+```
 
 ---
 
