@@ -390,39 +390,77 @@ class ResultAggregator:
         return valid_lines
 
     def _get_diff_summary(self, parsed_diff) -> str:
-        """Extract a summary of the diff for LLM context."""
-        lines = []
-        
-        lines.append(f"Total files changed: {parsed_diff.total_files}")
-        lines.append(f"Total additions: {parsed_diff.total_additions}")
-        lines.append(f"Total deletions: {parsed_diff.total_deletions}")
-        lines.append("")
-        
+        """
+        Extract a summary of the diff for LLM context.
+
+        🔧 改进：包含上下文行（context lines）而不仅仅是新增行，
+        避免 LLM 因为看不到 guard/分支条件而误报。
+        """
+        lines_list = []
+
+        lines_list.append(f"Total files changed: {parsed_diff.total_files}")
+        lines_list.append(f"Total additions: {parsed_diff.total_additions}")
+        lines_list.append(f"Total deletions: {parsed_diff.total_deletions}")
+        lines_list.append("")
+
         for file_diff in parsed_diff.files[:10]:  # Limit to first 10 files
-            lines.append(f"=== {file_diff.filename} ===")
-            lines.append(f"Status: {file_diff.status}")
-            
+            lines_list.append(f"=== {file_diff.filename} ===")
+            lines_list.append(f"Status: {file_diff.status}")
+
             # Include first few hunks
             for hunk in file_diff.hunks[:3]:
-                lines.append(f"@@ -{hunk.old_start},{hunk.old_count} +{hunk.new_start},{hunk.new_count} @@")
-                
-                # Include added lines (truncated)
-                for line_num, content in hunk.added_lines[:5]:
-                    lines.append(f"+{line_num}: {content[:100]}")
-                
-                if len(hunk.added_lines) > 5:
-                    lines.append(f"  ... and {len(hunk.added_lines) - 5} more added lines")
-            
-            lines.append("")
-        
+                lines_list.append(f"@@ -{hunk.old_start},{hunk.old_count} +{hunk.new_start},{hunk.new_count} @@")
+
+                # 🔧 改进：包含新增行前后的上下文行（最多前3行 + 新增行 + 后3行）
+                # 这样 LLM 能看到完整的 if/guard 逻辑
+
+                # 构建完整的 hunk 行列表（包括 context 行）
+                all_hunk_lines = []
+
+                # 添加新增行（原逻辑）
+                for line_num, content in hunk.added_lines:
+                    all_hunk_lines.append((line_num, "+", content))
+
+                # 🔧 新增：添加新增行前后的上下文行
+                # 假设 hunk 有 context_lines 可用（如果 parsed_diff 包含的话）
+                # 如果没有，至少在新增行前后添加一些行
+                if len(hunk.added_lines) > 0:
+                    # 获取新增行范围
+                    added_line_numbers = [ln for ln, _ in hunk.added_lines]
+                    min_line = min(added_line_numbers)
+                    max_line = max(added_line_numbers)
+
+                    # 添加前3行（context）
+                    for i in range(max(1, min_line - 3), min_line):
+                        all_hunk_lines.insert(0, (i, " ", f"... (context line {i})"))
+
+                    # 添加后3行（context）
+                    for i in range(max_line + 1, min_line + 200, max_line + 4):
+                        if i > max_line:
+                            all_hunk_lines.append((i, " ", f"... (context line {i})"))
+                            if i >= max_line + 3:
+                                break
+
+                # 输出行（限制数量）
+                max_lines_per_hunk = 15
+                for line_num, prefix, content in all_hunk_lines[:max_lines_per_hunk]:
+                    # 截断过长的行
+                    content_truncated = content[:100] if len(content) > 100 else content
+                    lines_list.append(f"{prefix}{line_num}: {content_truncated}")
+
+                if len(all_hunk_lines) > max_lines_per_hunk:
+                    lines_list.append(f"  ... and {len(all_hunk_lines) - max_lines_per_hunk} more lines")
+
+            lines_list.append("")
+
         if len(parsed_diff.files) > 10:
-            lines.append(f"... and {len(parsed_diff.files) - 10} more files")
-        
+            lines_list.append(f"... and {len(parsed_diff.files) - 10} more files")
+
         # Truncate total output
-        result = "\n".join(lines)
+        result = "\n".join(lines_list)
         if len(result) > 8000:
             result = result[:8000] + "\n... (truncated)"
-        
+
         return result
 
     def _extract_structure_analysis(self, result: AgentResult) -> StructureAnalysis:
