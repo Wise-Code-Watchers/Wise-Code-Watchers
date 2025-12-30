@@ -216,6 +216,125 @@ wise-code-watchers/
 
 ---
 
+
+## 🚀 Quick Start
+
+### Requirements
+
+- Python 3.12+
+- Docker (recommended)
+- GitHub App configuration
+
+### 1. Clone the Project
+
+```bash
+git clone https://github.com/your-org/wise-code-watchers.git
+cd wise-code-watchers
+```
+
+### 2. Install Dependencies
+
+```bash
+# Create virtual environment
+python -m venv venv
+source venv/bin/activate  # Linux/macOS
+# venv\Scripts\activate  # Windows
+
+# Install dependencies
+pip install -r requirements.txt
+```
+
+### 3. Configure Environment Variables
+
+Create a `.env` file:
+
+```bash
+# GitHub App Configuration
+GITHUB_APP_ID=your_app_id
+GITHUB_PRIVATE_KEY_PATH=/path/to/private-key.pem
+GITHUB_WEBHOOK_SECRET=your_webhook_secret
+
+# LLM Configuration
+BASE_URL=https://api.openai.com/v1
+OPENAI_API_KEY=your_openai_api_key
+MODEL=gpt-4
+
+# Service Configuration
+PORT=3000
+
+# Optional: Monitored Repositories (empty or * means monitor all)
+MONITORED_REPOS=repo1,repo2,repo3
+```
+
+### 4. Run the Service
+
+```bash
+# Run directly
+python app.py
+
+# Or with Docker
+docker-compose up -d
+```
+
+---
+
+## ⚙️ Configuration
+
+### Environment Variables
+
+| Variable Name                | Required | Default     | Description                          |
+| ---------------------------- | -------- | ----------- | ------------------------------------ |
+| `GITHUB_APP_ID`              | ✅        | -           | GitHub App ID                        |
+| `GITHUB_PRIVATE_KEY_PATH`    | ✅        | -           | Private key file path                |
+| `GITHUB_WEBHOOK_SECRET`      | ✅        | -           | Webhook secret                       |
+| `BASE_URL`                   | ⚠️        | -           | LLM API base URL (OpenAI-compatible) |
+| `OPENAI_API_KEY`             | ⚠️        | -           | OpenAI API Key                       |
+| `MODEL`                      | ❌        | `GLM-4.6`   | Model name                            |
+| `PORT`                       | ❌        | `3000`      | Service port                         |
+| `MONITORED_REPOS`            | ❌        | `*` (all)   | Comma-separated repository names to monitor (e.g., `repo1,repo2`). Empty or `*` means monitor all repositories where the GitHub App is installed |
+
+### GitHub App Configuration
+
+1. Create a GitHub App:
+   - Homepage URL: Your service address
+   - Webhook URL: `https://your-domain.com/webhook`
+   - Webhook Secret: Custom secret
+
+2. Permission Configuration:
+   - **Repository permissions**:
+     - Contents: Read
+     - Pull requests: Read and write
+     - Metadata: Read
+   - **Subscribe to events**:
+     - Pull request
+
+3. Generate and download the private key file
+
+---
+
+## 🔌 API Endpoints
+
+### Webhook Endpoint
+
+```
+POST /webhook
+```
+
+Receives GitHub Webhook events. Supported events:
+
+- `ping`: Health check
+- `pull_request`: PR events (opened, synchronize, reopened)
+
+### Health Check
+
+```
+GET /health
+```
+
+Returns service status.
+
+---
+
 ## 🔄 Workflow
 
 ### Complete Review Process
@@ -267,129 +386,6 @@ sequenceDiagram
 | **Security Agent**     | Detect security vulnerabilities       | Audit unit + Semgrep evidence | security_review   |
 | **Cross-File Analysis**| Analyze cross-file impact             | All analysis results    | cross_file_impact |
 | **Report Generation**  | Generate final report                 | All analysis results    | final_report      |
-
----
-
-## 🚀 Quick Start
-
-### Requirements
-
-- Python 3.12+
-- Docker (recommended)
-- GitHub App configuration
-
-### 1. Clone the Project
-
-```bash
-git clone https://github.com/your-org/wise-code-watchers.git
-cd wise-code-watchers
-```
-
-### 2. Install Dependencies
-
-```bash
-# Create virtual environment
-python -m venv venv
-source venv/bin/activate  # Linux/macOS
-# venv\Scripts\activate  # Windows
-
-# Install dependencies
-pip install -r requirements.txt
-```
-
-### 3. Configure Environment Variables
-
-Create a `.env` file:
-
-```bash
-# GitHub App Configuration
-GITHUB_APP_ID=your_app_id
-GITHUB_PRIVATE_KEY_PATH=/path/to/private-key.pem
-GITHUB_WEBHOOK_SECRET=your_webhook_secret
-
-# LLM Configuration
-OPENAI_API_KEY=your_openai_api_key
-# Or use OpenAI-compatible API
-LLM_BASE_URL=https://api.example.com/v1
-LLM_MODEL=gpt-4
-
-# Service Configuration
-PORT=3000
-
-# Optional: Vulnerability detection thresholds
-VULN_RISK_THRESHOLD_LOGIC=60
-VULN_RISK_THRESHOLD_SECURITY=35
-VULN_MAX_UNITS_LOGIC=12
-VULN_MAX_UNITS_SECURITY=10
-```
-
-### 4. Run the Service
-
-```bash
-# Run directly
-python app.py
-
-# Or with Docker
-docker-compose up -d
-```
-
----
-
-## ⚙️ Configuration
-
-### Environment Variables
-
-| Variable Name                | Required | Default  | Description                          |
-| ---------------------------- | -------- | -------- | ------------------------------------ |
-| `GITHUB_APP_ID`              | ✅        | -        | GitHub App ID                        |
-| `GITHUB_PRIVATE_KEY_PATH`    | ✅        | -        | Private key file path                |
-| `GITHUB_WEBHOOK_SECRET`      | ✅        | -        | Webhook secret                        |
-| `OPENAI_API_KEY`             | ⚠️        | -        | OpenAI API Key                        |
-| `LLM_BASE_URL`               | ❌        | -        | OpenAI-compatible API endpoint       |
-| `LLM_MODEL`                  | ❌        | `GLM-4.6`| Model name                            |
-| `PORT`                       | ❌        | `3000`   | Service port                          |
-| `VULN_RISK_THRESHOLD_LOGIC`  | ❌        | `60`     | Logic review risk threshold           |
-| `VULN_RISK_THRESHOLD_SECURITY`| ❌        | `35`     | Security review risk threshold        |
-
-### GitHub App Configuration
-
-1. Create a GitHub App:
-   - Homepage URL: Your service address
-   - Webhook URL: `https://your-domain.com/webhook`
-   - Webhook Secret: Custom secret
-
-2. Permission Configuration:
-   - **Repository permissions**:
-     - Contents: Read
-     - Pull requests: Read and write
-     - Metadata: Read
-   - **Subscribe to events**:
-     - Pull request
-
-3. Generate and download the private key file
-
----
-
-## 🔌 API Endpoints
-
-### Webhook Endpoint
-
-```
-POST /webhook
-```
-
-Receives GitHub Webhook events. Supported events:
-
-- `ping`: Health check
-- `pull_request`: PR events (opened, synchronize, reopened)
-
-### Health Check
-
-```
-GET /health
-```
-
-Returns service status.
 
 ---
 

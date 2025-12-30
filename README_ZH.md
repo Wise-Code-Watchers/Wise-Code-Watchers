@@ -216,6 +216,125 @@ wise-code-watchers/
 
 ---
 
+
+## 🚀 快速开始
+
+### 环境要求
+
+- Python 3.12+
+- Docker (推荐)
+- GitHub App 配置
+
+### 1. 克隆项目
+
+```bash
+git clone https://github.com/your-org/wise-code-watchers.git
+cd wise-code-watchers
+```
+
+### 2. 安装依赖
+
+```bash
+# 创建虚拟环境
+python -m venv venv
+source venv/bin/activate  # Linux/macOS
+# venv\Scripts\activate  # Windows
+
+# 安装依赖
+pip install -r requirements.txt
+```
+
+### 3. 配置环境变量
+
+创建 `.env` 文件：
+
+```bash
+# GitHub App 配置
+GITHUB_APP_ID=your_app_id
+GITHUB_PRIVATE_KEY_PATH=/path/to/private-key.pem
+GITHUB_WEBHOOK_SECRET=your_webhook_secret
+
+# LLM 配置
+BASE_URL=https://api.openai.com/v1
+OPENAI_API_KEY=your_openai_api_key
+MODEL=gpt-4
+
+# 服务配置
+PORT=3000
+
+# 可选：监控的仓库列表 (为空或 * 表示监控所有)
+MONITORED_REPOS=repo1,repo2,repo3
+```
+
+### 4. 运行服务
+
+```bash
+# 直接运行
+python app.py
+
+# 或使用 Docker
+docker-compose up -d
+```
+
+---
+
+## ⚙️ 配置说明
+
+### 环境变量
+
+| 变量名                         | 必需 | 默认值      | 说明                                    |
+| ------------------------------ | ---- | ----------- | --------------------------------------- |
+| `GITHUB_APP_ID`                | ✅    | -           | GitHub App ID                           |
+| `GITHUB_PRIVATE_KEY_PATH`      | ✅    | -           | 私钥文件路径                            |
+| `GITHUB_WEBHOOK_SECRET`        | ✅    | -           | Webhook 密钥                            |
+| `BASE_URL`                     | ⚠️    | -           | LLM API 基础 URL (兼容 OpenAI)          |
+| `OPENAI_API_KEY`               | ⚠️    | -           | OpenAI API Key                          |
+| `MODEL`                        | ❌    | `GLM-4.6`   | 模型名称                                |
+| `PORT`                         | ❌    | `3000`      | 服务端口                                |
+| `MONITORED_REPOS`              | ❌    | `*` (全部)  | 监控的仓库名称列表,逗号分隔 (如 `repo1,repo2`)。为空或 `*` 表示监控所有安装了此 GitHub App 的仓库 |
+
+### GitHub App 配置
+
+1. 创建 GitHub App：
+   - Homepage URL: 你的服务地址
+   - Webhook URL: `https://your-domain.com/webhook`
+   - Webhook Secret: 自定义密钥
+
+2. 权限配置：
+   - **Repository permissions**:
+     - Contents: Read
+     - Pull requests: Read and write
+     - Metadata: Read
+   - **Subscribe to events**:
+     - Pull request
+
+3. 生成并下载私钥文件
+
+---
+
+## 🔌 API 端点
+
+### Webhook 端点
+
+```
+POST /webhook
+```
+
+接收 GitHub Webhook 事件。支持的事件：
+
+- `ping`: 健康检查
+- `pull_request`: PR 事件 (opened, synchronize, reopened)
+
+### 健康检查
+
+```
+GET /health
+```
+
+返回服务状态。
+
+---
+
 ## 🔄 工作流程
 
 ### 完整审查流程
@@ -267,129 +386,6 @@ sequenceDiagram
 | **Security Agent**      | 检测安全漏洞                         | 审计单元 + Semgrep 证据 | security_review   |
 | **Cross-File Analysis** | 分析跨文件影响                       | 所有分析结果            | cross_file_impact |
 | **Report Generation**   | 生成最终报告                         | 所有分析结果            | final_report      |
-
----
-
-## 🚀 快速开始
-
-### 环境要求
-
-- Python 3.12+
-- Docker (推荐)
-- GitHub App 配置
-
-### 1. 克隆项目
-
-```bash
-git clone https://github.com/your-org/wise-code-watchers.git
-cd wise-code-watchers
-```
-
-### 2. 安装依赖
-
-```bash
-# 创建虚拟环境
-python -m venv venv
-source venv/bin/activate  # Linux/macOS
-# venv\Scripts\activate  # Windows
-
-# 安装依赖
-pip install -r requirements.txt
-```
-
-### 3. 配置环境变量
-
-创建 `.env` 文件：
-
-```bash
-# GitHub App 配置
-GITHUB_APP_ID=your_app_id
-GITHUB_PRIVATE_KEY_PATH=/path/to/private-key.pem
-GITHUB_WEBHOOK_SECRET=your_webhook_secret
-
-# LLM 配置
-OPENAI_API_KEY=your_openai_api_key
-# 或使用兼容 OpenAI 的 API
-LLM_BASE_URL=https://api.example.com/v1
-LLM_MODEL=gpt-4
-
-# 服务配置
-PORT=3000
-
-# 可选：漏洞检测阈值
-VULN_RISK_THRESHOLD_LOGIC=60
-VULN_RISK_THRESHOLD_SECURITY=35
-VULN_MAX_UNITS_LOGIC=12
-VULN_MAX_UNITS_SECURITY=10
-```
-
-### 4. 运行服务
-
-```bash
-# 直接运行
-python app.py
-
-# 或使用 Docker
-docker-compose up -d
-```
-
----
-
-## ⚙️ 配置说明
-
-### 环境变量
-
-| 变量名                         | 必需 | 默认值    | 说明                    |
-| ------------------------------ | ---- | --------- | ----------------------- |
-| `GITHUB_APP_ID`                | ✅    | -         | GitHub App ID           |
-| `GITHUB_PRIVATE_KEY_PATH`      | ✅    | -         | 私钥文件路径            |
-| `GITHUB_WEBHOOK_SECRET`        | ✅    | -         | Webhook 密钥            |
-| `OPENAI_API_KEY`               | ⚠️    | -         | OpenAI API Key          |
-| `LLM_BASE_URL`                 | ❌    | -         | 兼容 OpenAI 的 API 地址 |
-| `LLM_MODEL`                    | ❌    | `GLM-4.6` | 模型名称                |
-| `PORT`                         | ❌    | `3000`    | 服务端口                |
-| `VULN_RISK_THRESHOLD_LOGIC`    | ❌    | `60`      | 逻辑审查风险阈值        |
-| `VULN_RISK_THRESHOLD_SECURITY` | ❌    | `35`      | 安全审查风险阈值        |
-
-### GitHub App 配置
-
-1. 创建 GitHub App：
-   - Homepage URL: 你的服务地址
-   - Webhook URL: `https://your-domain.com/webhook`
-   - Webhook Secret: 自定义密钥
-
-2. 权限配置：
-   - **Repository permissions**:
-     - Contents: Read
-     - Pull requests: Read and write
-     - Metadata: Read
-   - **Subscribe to events**:
-     - Pull request
-
-3. 生成并下载私钥文件
-
----
-
-## 🔌 API 端点
-
-### Webhook 端点
-
-```
-POST /webhook
-```
-
-接收 GitHub Webhook 事件。支持的事件：
-
-- `ping`: 健康检查
-- `pull_request`: PR 事件 (opened, synchronize, reopened)
-
-### 健康检查
-
-```
-GET /health
-```
-
-返回服务状态。
 
 ---
 

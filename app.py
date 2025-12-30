@@ -275,6 +275,15 @@ def handle_pull_request_async(payload: dict):
     if action not in ("opened", "synchronize", "reopened"):
         return jsonify({"message": f"PR action {action} ignored"}), 200
 
+    # Check if repository is monitored
+    if not Config.is_repo_monitored(repo_full_name):
+        logger.info(f"Repository {repo_full_name} is not in monitored list, skipping PR #{pr_number}")
+        return jsonify({
+            "message": "Repository not monitored",
+            "repo": repo_full_name,
+            "status": "skipped"
+        }), 200
+
     # 创建任务并放入队列
     task = PRTask(payload)
     task_queue.put(task)
@@ -294,10 +303,13 @@ def handle_pull_request_async(payload: dict):
 @app.route("/health", methods=["GET"])
 def health():
     """健康检查端点"""
+    monitored_repos = Config.get_monitored_repos()
     return jsonify({
         "status": "healthy",
         "queue_size": task_queue.qsize(),
         "active_workers": len(worker_threads),
+        "monitored_repos": list(monitored_repos) if monitored_repos else "all",
+        "monitoring_mode": "specific" if monitored_repos else "all"
     }), 200
 
 
@@ -311,8 +323,32 @@ def queue_status():
     }), 200
 
 
+@app.route("/config", methods=["GET"])
+def config_status():
+    """配置状态端点 - 查看当前监控配置"""
+    monitored_repos = Config.get_monitored_repos()
+
+    return jsonify({
+        "monitoring_mode": "specific" if monitored_repos else "all",
+        "monitored_repos": list(monitored_repos) if monitored_repos else [],
+        "monitored_repos_count": len(monitored_repos) if monitored_repos else 0,
+        "config_description": "Monitoring specific repositories" if monitored_repos else "Monitoring all repositories with GitHub App installed"
+    }), 200
+
+
 if __name__ == "__main__":
     Config.validate()
+
+    # Log monitoring configuration
+    monitored_repos = Config.get_monitored_repos()
+    if monitored_repos:
+        logger.info(f"🎯 Monitoring mode: SPECIFIC repositories")
+        logger.info(f"📋 Monitored repositories ({len(monitored_repos)}):")
+        for repo in sorted(monitored_repos):
+            logger.info(f"   - {repo}")
+    else:
+        logger.info(f"🌍 Monitoring mode: ALL repositories")
+        logger.info(f"📋 Will monitor all repositories where the GitHub App is installed")
 
     # 启动后台工作线程
     logger.info(f"Starting {MAX_WORKERS} worker threads...")
@@ -320,5 +356,6 @@ if __name__ == "__main__":
 
     logger.info(f"Starting webhook server on port {Config.PORT}")
     logger.info(f"PR processing is asynchronous - max {MAX_WORKERS} PRs can be processed in parallel")
+    logger.info(f"View monitoring config: GET http://localhost:{Config.PORT}/config")
 
     app.run(host="0.0.0.0", port=Config.PORT, debug=False, threaded=True)

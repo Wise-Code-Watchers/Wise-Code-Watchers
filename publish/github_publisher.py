@@ -29,7 +29,10 @@ def _extract_inline_comments_from_issues(
 
     # Extract issues from logic_review
     # Structure: logic_review.issues[] is an array of analysis units
-    # Each unit has: {result: "ISSUE", issues: [...], _meta: {...}}
+    # Each unit has: {result: "ISSUE", issues: [...], _meta: {...} or [...]}
+    # _meta can be:
+    #   - Object with hunk_id: {hunk_id, file_path, risk_score}  (Logic/Security Agent)
+    #   - Array of location objects: [{file_path, line_start, line_end}, ...]  (deprecated)
     logic_review = final_report.get("logic_review", {})
     for analysis_unit in logic_review.get("issues", []):
         # Only process units that found issues
@@ -40,13 +43,25 @@ def _extract_inline_comments_from_issues(
         unit_issues = analysis_unit.get("issues", [])
         unit_meta = analysis_unit.get("_meta", {})
 
+        # Handle both object and array formats
+        meta_entries = []
+        if isinstance(unit_meta, list):
+            # Array format: each entry is a location object
+            meta_entries = unit_meta
+        else:
+            # Object format: single meta entry with hunk_id
+            meta_entries = [unit_meta]
+
         # Process each issue in this unit
         for issue_obj in unit_issues:
-            # Attach _meta to the issue object for line mapping
-            issue_obj_with_meta = {**issue_obj, "_meta": unit_meta}
-            comments.extend(_convert_issue_to_inline_comment(
-                issue_obj_with_meta, file_line_mapping, "Logic"
-            ))
+            for meta_entry in meta_entries:
+                issue_obj_with_meta = {
+                    **issue_obj,
+                    "_meta": meta_entry,
+                }
+                comments.extend(_convert_issue_to_inline_comment(
+                    issue_obj_with_meta, file_line_mapping, "Logic"
+                ))
 
     # Extract issues from security_review
     security_review = final_report.get("security_review", {})
@@ -57,11 +72,24 @@ def _extract_inline_comments_from_issues(
         unit_issues = analysis_unit.get("issues", [])
         unit_meta = analysis_unit.get("_meta", {})
 
+        # Handle both object and array formats
+        meta_entries = []
+        if isinstance(unit_meta, list):
+            # Array format: each entry is a location object
+            meta_entries = unit_meta
+        else:
+            # Object format: single meta entry with hunk_id
+            meta_entries = [unit_meta]
+
         for issue_obj in unit_issues:
-            issue_obj_with_meta = {**issue_obj, "_meta": unit_meta}
-            comments.extend(_convert_issue_to_inline_comment(
-                issue_obj_with_meta, file_line_mapping, "Security"
-            ))
+            for meta_entry in meta_entries:
+                issue_obj_with_meta = {
+                    **issue_obj,
+                    "_meta": meta_entry,
+                }
+                comments.extend(_convert_issue_to_inline_comment(
+                    issue_obj_with_meta, file_line_mapping, "Security"
+                ))
 
     return comments
 
@@ -81,6 +109,10 @@ def _build_file_line_mapping(diff_ir: Dict[str, Any]) -> Dict[str, Any]:
     """
     mapping: Dict[str, Any] = {}
 
+    # 🔧 Validation: Check if hunks have hunk_id
+    missing_hunk_id_count = 0
+    total_hunks = 0
+
     for file_entry in diff_ir.get("files", []):
         file_path = file_entry.get("file_path")
         if not file_path:
@@ -91,6 +123,18 @@ def _build_file_line_mapping(diff_ir: Dict[str, Any]) -> Dict[str, Any]:
         old_to_new = {}
 
         for hunk in hunks:
+            total_hunks += 1
+
+            # Validate hunk_id presence
+            hunk_id = hunk.get("hunk_id")
+            if not hunk_id:
+                missing_hunk_id_count += 1
+                logger.error(
+                    f"❌ VALIDATION ERROR: Hunk missing hunk_id in file '{file_path}'. "
+                    f"This will cause inline comment publishing to fail. "
+                    f"Please regenerate diff_ir with updated data_parser.py."
+                )
+
             for line_entry in hunk.get("lines", []):
                 new_ln = line_entry.get("new_lineno")
                 old_ln = line_entry.get("old_lineno")
@@ -109,6 +153,17 @@ def _build_file_line_mapping(diff_ir: Dict[str, Any]) -> Dict[str, Any]:
             "touched_new_lines": touched_new_lines,
             "old_to_new": old_to_new,
         }
+
+    # Log validation summary
+    if total_hunks > 0:
+        if missing_hunk_id_count > 0:
+            logger.error(
+                f"❌ VALIDATION FAILED: {missing_hunk_id_count}/{total_hunks} hunks are missing hunk_id. "
+                f"This WILL cause inline comment publishing to fail. "
+                f"Please regenerate diff_ir by re-running parsing/data_parser.py"
+            )
+        else:
+            logger.info(f"✅ VALIDATION PASSED: All {total_hunks} hunks have hunk_id")
 
     return mapping
 
@@ -243,29 +298,92 @@ def _convert_issue_to_inline_comment(
 
     body = "\n".join(body_lines)
 
-    # Get issue location
-    location = issue_obj.get("location", {})
-    line_start = location.get("line_start")
-    line_end = location.get("line_end")
+    # Get issue location from _meta
+    # _meta can be:
+    #   1. Object with hunk_id: {hunk_id, file_path, risk_score}  (Logic/Security Agent + AI analysis)
+    #   2. Object with line numbers: {file_path, line_start, line_end}  (deprecated array format entries)
+    meta = issue_obj.get("_meta", {})
+    hunk_id = meta.get("hunk_id")
 
-    if not line_start:
+    # Strategy 1: Use hunk_id to find exact line numbers (preferred method)
+    if hunk_id:
+        logger.debug(f"Processing issue with hunk_id: {hunk_id} in {file_path}")
+
+        # Find the hunk in the file mapping
+        file_map = file_line_mapping.get(file_path, {})
+        hunks = file_map.get("hunks", [])
+
+        target_hunk = None
+        for hunk in hunks:
+            if hunk.get("hunk_id") == hunk_id:
+                target_hunk = hunk
+                break
+
+        if not target_hunk:
+            logger.warning(
+                f"Hunk ID {hunk_id} not found in file {file_path}. "
+                f"Available hunks: {[h.get('hunk_id') for h in hunks[:5]]}"
+            )
+            return []
+
+        # Extract line numbers from hunk metadata
+        # Use new_start for RIGHT side positioning
+        new_start = target_hunk.get("new_start")
+        new_count = target_hunk.get("new_count", 0)
+
+        if new_start is None:
+            logger.warning(f"Hunk {hunk_id} has no new_start for {file_path}")
+            return []
+
+        # Build comment dict with hunk location
+        comment = {
+            "path": file_path,
+            "body": body,
+            "side": "RIGHT",
+            "start_line": new_start,
+            "line": new_start + new_count - 1,  # End of hunk
+        }
+
+        logger.debug(
+            f"  → Hunk-based comment from {comment['start_line']} to {comment['line']}"
+        )
+        comments.append(comment)
+        return comments
+
+    # Strategy 2: Use line_start/line_end directly (fallback for deprecated format)
+    line_start = meta.get("line_start")
+    line_end = meta.get("line_end")
+
+    if line_start is None:
         logger.warning(
-            f"No line number found for issue in {file_path}. "
-            f"Location: {location}, Issue keys: {list(issue_obj.keys())}"
+            f"No hunk_id or line_start found for issue in {file_path}. "
+            f"Meta: {meta}, Issue keys: {list(issue_obj.keys())}"
         )
         return []
+
+    # Ensure line numbers are integers
+    try:
+        line_start = int(line_start)
+        line_end = int(line_end) if line_end is not None else line_start
+    except (ValueError, TypeError):
+        logger.warning(f"Invalid line number format in meta: {meta}")
+        return []
+
+    logger.debug(f"Processing issue at {file_path}:{line_start}-{line_end}")
 
     # Resolve review line(s) using the improved strategy
     file_map = file_line_mapping[file_path]
     resolved = _resolve_review_line(
         file_mapping=file_map,
-        line_start=int(line_start),
-        line_end=int(line_end) if line_end else None,
+        line_start=line_start,
+        line_end=line_end if line_end != line_start else None,  # Only specify end if different
     )
 
     if not resolved:
         logger.warning(
-            f"Could not resolve issue line(s) {line_start}-{line_end} to PR diff for {file_path}"
+            f"Could not resolve issue line(s) {line_start}-{line_end} to PR diff for {file_path}. "
+            f"File has {len(file_map.get('touched_new_lines', set()))} touched lines: "
+            f"{sorted(list(file_map.get('touched_new_lines', set())))[:10]}..."
         )
         return []
 
@@ -279,13 +397,16 @@ def _convert_issue_to_inline_comment(
     # Single-line comment
     if "start_line" not in resolved:
         comment["line"] = resolved["line"]
+        logger.debug(f"  → Single-line comment at line {resolved['line']}")
     else:
         # Multi-line comment: "Comment on lines +x to +y"
         comment["start_line"] = resolved["start_line"]
         comment["line"] = resolved["line"]
         comment["start_side"] = "RIGHT"
+        logger.debug(f"  → Multi-line comment from {resolved['start_line']} to {resolved['line']}")
 
     comments.append(comment)
+
     return comments
 
 
@@ -773,22 +894,51 @@ class GitHubPublisher:
                 )
 
             # Publish the review with inline comments
-            self.client.create_review(
-                repo_full_name=repo_full_name,
-                pr_number=pr_number,
-                body=body,
-                event=event,
-                comments=inline_comments,
-            )
+            try:
+                self.client.create_review(
+                    repo_full_name=repo_full_name,
+                    pr_number=pr_number,
+                    body=body,
+                    event=event,
+                    comments=inline_comments,
+                )
 
-            return {
-                "type": "comprehensive_review",
-                "event": event,
-                "body_length": len(body),
-                "logic_issues": logic_issues,
-                "security_issues": security_issues,
-                "inline_comments_count": len(inline_comments),
-            }
+                return {
+                    "type": "comprehensive_review",
+                    "event": event,
+                    "body_length": len(body),
+                    "logic_issues": logic_issues,
+                    "security_issues": security_issues,
+                    "inline_comments_count": len(inline_comments),
+                }
+            except Exception as e:
+                # If inline comments fail (e.g., line resolution errors), retry without them
+                if "could not be resolved" in str(e).lower() and inline_comments:
+                    logger.warning(
+                        f"Inline comments failed due to line resolution errors. "
+                        f"Retrying review without inline comments. Error: {e}"
+                    )
+                    self.client.create_review(
+                        repo_full_name=repo_full_name,
+                        pr_number=pr_number,
+                        body=body,
+                        event=event,
+                        comments=[],  # Retry without inline comments
+                    )
+
+                    return {
+                        "type": "comprehensive_review",
+                        "event": event,
+                        "body_length": len(body),
+                        "logic_issues": logic_issues,
+                        "security_issues": security_issues,
+                        "inline_comments_count": 0,
+                        "inline_comments_skipped": len(inline_comments),
+                        "warning": f"Inline comments skipped due to line resolution errors: {str(e)[:200]}",
+                    }
+                else:
+                    # Re-raise if it's a different error
+                    raise
 
         except Exception as e:
             logger.error(f"Failed to publish comprehensive review: {e}")
