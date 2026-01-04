@@ -27,6 +27,8 @@
 - 📊 **智能风险评估**：AI 驱动的风险评分系统，优先审查高风险代码
 - 🔗 **跨文件分析**：分析代码变更的跨文件影响
 - 💬 **GitHub 深度集成**：自动发布行内评论到 PR，支持 GitHub App Webhook
+- 🗳️ **LLM 投票共识**：3个LLM并行分析，选择最佳结果，避免单点偏差
+- 🛡️ **Nil-Guard 过滤器**：自动过滤 nil/NoMethodError 误报，提升报告质量
 
 ---
 
@@ -98,9 +100,7 @@ wise-code-watchers/
 ├── agents/                     # 🤖 Agent 模块
 │   ├── __init__.py
 │   ├── base.py                 # Agent 基类
-│   ├── aggregator.py           # 结果聚合器
 │   ├── orchestrator.py         # Agent 编排器
-│   ├── issue_scoring_filter.py # Issue 评分过滤器 (LLM 三维评分)
 │   ├── summary_agent.py        # 总结 Agent
 │   │
 │   ├── preprocessing/          # 预处理模块
@@ -160,11 +160,16 @@ wise-code-watchers/
 │           │   │   └── todolist_executor.py           # TODO 列表执行
 │           │   ├── analysis/
 │           │   │   ├── initialization_engine.py       # 初始化引擎
-│           │   │   └── vulnerability_analyzer.py      # 漏洞分析
+│           │   │   └── vulnerability_analyzer.py      # 漏洞分析 (含 LLM 共识 & Nil-Guard)
 │           │   └── smart_context_builder.py           # 智能上下文构建
 │           │
 │           ├── prompts/             # LLM 提示词
-│           │   └── prompt.py
+│           │   ├── __init__.py
+│           │   ├── prompt.py                  # 主要提示词
+│           │   ├── schema_validator.py         # JSON schema 验证器
+│           │   ├── markdown_renderer.py        # JSON 转 Markdown 转换器
+│           │   ├── structured_output_helper.py # 结构化输出集成
+│           │   └── report_schema.json           # JSON schema
 │           │
 │           ├── mcpTools/           # MCP 工具集成
 │           │   └── mcpTools.py

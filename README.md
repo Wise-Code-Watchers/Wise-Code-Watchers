@@ -27,6 +27,8 @@
 - 📊 **Intelligent Risk Assessment**: AI-driven risk scoring system prioritizes high-risk code for review
 - 🔗 **Cross-File Analysis**: Analyzes the cross-file impact of code changes
 - 💬 **Deep GitHub Integration**: Automatically posts inline comments to PRs with GitHub App Webhook support
+- 🗳️ **LLM Consensus Voting**: 3 LLMs analyze each feature in parallel, selecting the best result to avoid single-point bias
+- 🛡️ **Nil-Guard Filter**: Automatically filters nil/NoMethodError false positives to improve report quality
 
 ---
 
@@ -98,9 +100,7 @@ wise-code-watchers/
 ├── agents/                     # 🤖 Agent modules
 │   ├── __init__.py
 │   ├── base.py                 # Agent base class
-│   ├── aggregator.py           # Result aggregator
 │   ├── orchestrator.py         # Agent orchestrator
-│   ├── issue_scoring_filter.py # Issue scoring filter (LLM 3D scoring)
 │   ├── summary_agent.py        # Summary agent
 │   │
 │   ├── preprocessing/          # Preprocessing modules
@@ -160,11 +160,16 @@ wise-code-watchers/
 │           │   │   └── todolist_executor.py           # TODO list executor
 │           │   ├── analysis/
 │           │   │   ├── initialization_engine.py       # Initialization engine
-│           │   │   └── vulnerability_analyzer.py      # Vulnerability analyzer
+│           │   │   └── vulnerability_analyzer.py      # Vulnerability analyzer (with LLM consensus & Nil-Guard)
 │           │   └── smart_context_builder.py           # Smart context builder
 │           │
 │           ├── prompts/             # LLM prompts
-│           │   └── prompt.py
+│           │   ├── __init__.py
+│           │   ├── prompt.py             # Main prompts
+│           │   ├── schema_validator.py  # JSON schema validator
+│           │   ├── markdown_renderer.py  # JSON-to-Markdown converter
+│           │   ├── structured_output_helper.py  # Structured output integration
+│           │   └── report_schema.json      # JSON schema for validation
 │           │
 │           ├── mcpTools/           # MCP tools integration
 │           │   └── mcpTools.py
