@@ -51,7 +51,6 @@ class PRExporter:
 
         self._export_commits_with_diffs(repo_full_name, commits, output_dir)
 
-        # Generate functional summary if LLM is provided
         functional_summary = None
         if self.llm:
             try:

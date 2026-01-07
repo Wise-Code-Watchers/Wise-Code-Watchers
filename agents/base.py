@@ -27,12 +27,7 @@ class AgentResult:
 
 
 class BaseAgent(ABC):
-    """
-    Legacy base agent class.
-    
-    Note: For new agents, prefer using LangGraph StateGraph directly.
-    See agents/syntax/syntax_analysis_agent.py for the recommended pattern.
-    """
+    """Legacy base agent class - prefer LangGraph StateGraph for new agents"""
     name: str
     description: str
 
@@ -80,22 +75,5 @@ def create_llm_with_structured_output(
     llm: BaseChatModel,
     schema: type,
 ):
-    """
-    Bind structured output schema to LLM.
-    
-    Args:
-        llm: Base chat model
-        schema: Pydantic model class for output
-        
-    Returns:
-        LLM configured for structured output
-        
-    Example:
-        ```python
-        from agents.syntax.schemas import AnalysisInsight
-        
-        structured_llm = create_llm_with_structured_output(llm, AnalysisInsight)
-        result = await structured_llm.ainvoke(messages)
-        ```
-    """
+    """Bind structured output schema to LLM"""
     return llm.with_structured_output(schema)
