@@ -7,6 +7,59 @@ from output.report_generator import ReportGenerator
 logger = logging.getLogger(__name__)
 
 
+def _extract_code_context(
+    diff_ir: Dict[str, Any],
+    file_path: str,
+    target_line: int,
+    context_lines: int = 5
+) -> Optional[str]:
+    """
+    Extract code context from diff_ir around a specific line.
+
+    Returns only the code content (without line numbers), formatted for code block.
+    """
+    for file_entry in diff_ir.get("files", []):
+        if file_entry.get("file_path") != file_path:
+            continue
+
+        hunks = file_entry.get("hunks", [])
+        for hunk in hunks:
+            lines_context = []
+
+            for line_entry in hunk.get("lines", []):
+                new_lineno = line_entry.get("new_lineno")
+
+                # Only consider lines on the RIGHT side
+                if new_lineno is None:
+                    continue
+
+                # Check if this line is within context range
+                if abs(new_lineno - target_line) <= context_lines:
+                    line_type = line_entry.get("type", "context")
+                    content = line_entry.get("content", "")
+
+                    # Add prefix based on line type
+                    if line_type == "add":
+                        prefix = "+"
+                    elif line_type == "del":
+                        prefix = "-"
+                    else:
+                        prefix = " "
+
+                    lines_context.append((new_lineno, prefix, content))
+
+            if not lines_context:
+                continue
+
+            # Sort by line number and format
+            lines_context.sort(key=lambda x: x[0])
+            context_str = "\n".join([f"{prefix} {content}" for _, prefix, content in lines_context])
+
+            return context_str
+
+    return None
+
+
 def _extract_inline_comments_from_issues(
     final_report: Dict[str, Any],
     diff_ir: Dict[str, Any],
@@ -91,7 +144,188 @@ def _extract_inline_comments_from_issues(
                     issue_obj_with_meta, file_line_mapping, "Security"
                 ))
 
-    return comments
+    # ✅ Extract issues from vulnerability_analysis (AI-based with precise line numbers)
+    # Structure: vulnerability_analysis.feature_analyses[].vulnerabilities[]
+    # Each vulnerability has: {type, file_path, line, description, severity, ...}
+    vuln_analysis = final_report.get("vulnerability_analysis", {})
+    for feature in vuln_analysis.get("feature_analyses", []):
+        vulnerabilities = feature.get("vulnerabilities", [])
+
+        for vuln in vulnerabilities:
+            file_path = vuln.get("file_path")
+            line = vuln.get("line")
+            vuln_type = vuln.get("type", "Issue")
+            description = vuln.get("description", "")
+            severity = vuln.get("severity", "unknown")
+            suggestion = vuln.get("suggestion", "")
+            code_snippet = vuln.get("code_snippet", "")
+            root_cause = vuln.get("root_cause", "")
+            fix_recommendation = vuln.get("fix_recommendation", "")
+
+            # Validate required fields
+            if not file_path or line is None:
+                logger.debug(
+                    f"Skipping vulnerability without file_path or line: "
+                    f"type={vuln_type}, file_path={file_path}, line={line}"
+                )
+                continue
+
+            # Get file mapping for line resolution
+            file_map = file_line_mapping.get(file_path)
+            if not file_map:
+                logger.warning(f"File not in diff_ir: {file_path}")
+                continue
+
+            # Resolve line to GitHub review comment format
+            resolved = _resolve_review_line(file_map, line)
+            if not resolved:
+                logger.warning(
+                    f"Could not resolve line {line} in file {file_path}"
+                )
+                continue
+
+            # Extract code context from diff_ir (上下5行)
+            code_context = _extract_code_context(diff_ir, file_path, line, context_lines=5)
+
+            # Build comment body with detailed information
+            body_lines = [
+                f"**{severity.upper()}: {vuln_type}**",
+                "",
+            ]
+
+            # Description
+            if description:
+                body_lines.append(f"**📝 Description:**")
+                body_lines.append(description)
+                body_lines.append("")
+
+            # Root Cause
+            if root_cause:
+                body_lines.append(f"**🔍 Root Cause:**")
+                body_lines.append(root_cause)
+                body_lines.append("")
+
+            # Code Context (上下5行) - 使用代码块格式
+            if code_context:
+                body_lines.append(f"**📌 Code Context (±5 lines):**")
+                body_lines.append("```python")
+                body_lines.append(code_context)
+                body_lines.append("```")
+                body_lines.append("")
+
+            # Fix Recommendation
+            if fix_recommendation:
+                body_lines.append(f"**✅ Fix Recommendation:**")
+                body_lines.append(fix_recommendation)
+                body_lines.append("")
+
+            # Additional Suggestion (如果有)
+            if suggestion and suggestion != fix_recommendation:
+                body_lines.append(f"**💡 Suggestion:**")
+                body_lines.append(suggestion)
+                body_lines.append("")
+
+            body_lines.append(
+                "---\n*Detected by AI Vulnerability Analysis*"
+            )
+
+            body = "\n".join(body_lines)
+
+            # Create comment dict
+            comment = {
+                "path": file_path,
+                "body": body,
+                "side": "RIGHT",
+                **resolved,  # {"line": X} or {"start_line": X, "line": Y}
+            }
+
+            comments.append(comment)
+            logger.debug(
+                f"Added vulnerability inline comment: {file_path}:{line} "
+                f"({vuln_type})"
+            )
+
+    # ✅ Deduplicate comments: prefer precise line-level over hunk-level
+    # Strategy: For comments in the same file, if a line-level comment's line
+    # falls within a hunk-level comment's range, keep only the line-level one
+    deduped_comments = []
+    removed_count = 0
+
+    # Sort comments: line-level (no start_line) first, then hunk-level
+    comments_sorted = sorted(
+        comments,
+        key=lambda c: (
+            c.get("path", ""),
+            0 if c.get("start_line") is None else 1,  # line-level first
+            c.get("line", 0),
+        )
+    )
+
+    for comment in comments_sorted:
+        file_path = comment.get("path")
+        line = comment.get("line")
+        start_line = comment.get("start_line")
+        is_line_level = start_line is None
+
+        # Check if this comment overlaps with any already-kept comment
+        is_duplicate = False
+
+        for kept in deduped_comments:
+            if kept.get("path") != file_path:
+                continue
+
+            kept_line = kept.get("line")
+            kept_start = kept.get("start_line")
+            kept_is_line_level = kept_start is None
+
+            # Both are line-level: same line = duplicate
+            if is_line_level and kept_is_line_level:
+                if line == kept_line:
+                    is_duplicate = True
+                    break
+
+            # New is line-level, kept is hunk-level: check if line is in hunk range
+            elif is_line_level and not kept_is_line_level:
+                if kept_start <= line <= kept_line:
+                    # Line-level is more precise, remove the hunk-level one
+                    deduped_comments.remove(kept)
+                    removed_count += 1
+                    logger.debug(
+                        f"Replaced hunk-level {file_path}:L{kept_start}-L{kept_line} "
+                        f"with precise line-level {file_path}:L{line}"
+                    )
+                    # Don't mark new as duplicate, will be added below
+                    break
+
+            # New is hunk-level, kept is line-level: check if kept line is in hunk range
+            elif not is_line_level and kept_is_line_level:
+                if start_line <= kept_line <= line:
+                    # Hunk-level overlaps with existing line-level, skip hunk-level
+                    is_duplicate = True
+                    removed_count += 1
+                    logger.debug(
+                        f"Skipping hunk-level {file_path}:L{start_line}-L{line} "
+                        f"(already have line-level {file_path}:L{kept_line})"
+                    )
+                    break
+
+            # Both are hunk-level: check range overlap
+            elif not is_line_level and not kept_is_line_level:
+                if start_line <= kept_line and line >= kept_start:
+                    # Ranges overlap, keep first one
+                    is_duplicate = True
+                    break
+
+        if not is_duplicate:
+            deduped_comments.append(comment)
+
+    if removed_count > 0:
+        logger.info(
+            f"Deduplicated comments: {len(comments)} -> {len(deduped_comments)} "
+            f"(removed {removed_count} duplicates)"
+        )
+
+    return deduped_comments
 
 
 def _build_file_line_mapping(diff_ir: Dict[str, Any]) -> Dict[str, Any]:

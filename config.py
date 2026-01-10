@@ -17,7 +17,7 @@ class Config:
 
     # Enhanced Vulnerability Detection Configuration
     VULN_RISK_THRESHOLD_LOGIC = int(os.getenv("VULN_RISK_THRESHOLD_LOGIC", 60))
-    VULN_RISK_THRESHOLD_SECURITY = int(os.getenv("VULN_RISK_THRESHOLD_SECURITY", 35))
+    VULN_RISK_THRESHOLD_SECURITY = int(os.getenv("VULN_RISK_THRESHOLD_SECURITY", 60))
     VULN_MAX_UNITS_LOGIC = int(os.getenv("VULN_MAX_UNITS_LOGIC", 12))
     VULN_MAX_UNITS_SECURITY = int(os.getenv("VULN_MAX_UNITS_SECURITY", 10))
 
