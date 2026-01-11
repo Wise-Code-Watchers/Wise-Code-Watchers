@@ -35,52 +35,156 @@
 
 ## 🏗️ System Architecture
 
+### High-Level System Architecture
+
+```mermaid
+graph TB
+    subgraph "External Systems"
+        GitHub[GitHub<br/>Webhooks & API]
+        LLM[LLM API<br/>OpenAI/GLM]
+        Langfuse[Langfuse<br/>Observability]
+        Semgrep[Semgrep<br/>Security Scanner]
+    end
+
+    subgraph "Wise Code Watchers"
+        subgraph "Web Layer"
+            Flask[Flask Web Server]
+            Webhook[Webhook Handler]
+            Queue[Task Queue]
+        end
+
+        subgraph "Processing Layer"
+            LangGraph[LangGraph Workflow Engine]
+        end
+
+        subgraph "Agent Layer"
+            Logic[Logic Agent<br/>Logic Defects]
+            Security[Security Agent<br/>Vulnerabilities]
+            Triage[Triage Agent<br/>Priority Filtering]
+        end
+
+        subgraph "Output Layer"
+            Report[Report Generator]
+            Publisher[GitHub Publisher]
+        end
+    end
+
+    GitHub --> Webhook
+    Webhook --> Queue
+    Queue --> LangGraph
+
+    LangGraph --> Logic
+    LangGraph --> Security
+    LangGraph --> Triage
+
+    Semgrep -.->|Evidence| LangGraph
+    LLM -.->|Analysis| LangGraph
+
+    Logic --> Report
+    Security --> Report
+    Triage --> Report
+
+    Report --> Publisher
+    Publisher --> GitHub
+
+    LangGraph -.->|Tracing| Langfuse
+
+    style GitHub fill:#f0f9ff,stroke:#0284c7,stroke-width:2px
+    style LLM fill:#f0fdf4,stroke:#16a34a,stroke-width:2px
+    style Langfuse fill:#fef3c7,stroke:#f59e0b,stroke-width:2px
+    style Semgrep fill:#fef2f2,stroke:#dc2626,stroke-width:2px
 ```
-┌─────────────────────────────────────────────────────────────────────────────┐
-│                              Wise Code Watchers                             │
-├─────────────────────────────────────────────────────────────────────────────┤
-│                                                                              │
-│  ┌──────────────┐    ┌──────────────┐    ┌──────────────────────────────┐  │
-│  │  GitHub App  │───▶│   Webhook    │───▶│       PR Exporter            │  │
-│  │   Webhook    │    │   Handler    │    │  (metadata/diff/commits)     │  │
-│  └──────────────┘    └──────────────┘    └──────────────────────────────┘  │
-│                                                      │                       │
-│                                                      ▼                       │
-│  ┌───────────────────────────────────────────────────────────────────────┐  │
-│  │                     LangGraph Workflow Engine                          │  │
-│  │  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐   │  │
-│  │  │ Data Parse  │─▶│ Risk Analyze│─▶│  Triage    │─▶│  Parallel   │   │  │
-│  │  │    Node     │  │    Node     │  │   Node      │  │  Analysis   │   │  │
-│  │  └─────────────┘  └─────────────┘  └─────────────┘  └─────────────┘   │  │
-│  │                                                            │           │  │
-│  │                    ┌─────────────────────┬────────────────┘            │  │
-│  │                    ▼                     ▼                               │  │
-│  │            ┌──────────────┐      ┌──────────────┐                       │  │
-│  │            │ Logic Agent  │      │Security Agent│                       │  │
-│  │            │(Logic Review)│      │(Security Review)                     │  │
-│  │            └──────────────┘      └──────────────┘                       │  │
-│  │                    │                      │                               │  │
-│  │                    └──────────┬───────────┘                               │  │
-│  │                               ▼                                         │  │
-│  │                    ┌──────────────────┐                                  │  │
-│  │                    │ Report Generator │                                │  │
-│  │                    └──────────────────┘                                │  │
-│  └───────────────────────────────────────────────────────────────────────┘  │
-│                                        │                                     │
-│                                        ▼                                     │
-│                         ┌──────────────────────────┐                        │
-│                         │    GitHub Publisher      │                        │
-│                         │  (PR Comments/Reviews)   │                        │
-│                         └──────────────────────────┘                        │
-│                                                                              │
-│  ┌──────────────────────────────────────────────────────────────────────┐  │
-│  │                    🔍 Langfuse Tracing                              │  │
-│  │  ┌────────────┐  ┌────────────┐  ┌────────────┐  ┌────────────┐    │  │
-│  │  │  LLM Calls │  │  Workflows │  │   Agents   │  │   Tools    │    │  │
-│  │  │   Traced   │  │   Traced   │  │   Traced   │  │   Traced   │    │  │
-│  │  └────────────┘  └────────────┘  └────────────┘  └────────────┘    │  │
-│  └──────────────────────────────────────────────────────────────────────┘  │
-└─────────────────────────────────────────────────────────────────────────────┘
+
+### Data Flow
+
+```mermaid
+flowchart LR
+    GH[GitHub PR Event] --> WH[Webhook Handler]
+    WH --> EXP[PR Exporter]
+    EXP --> WF[LangGraph Workflow]
+
+    WF --> DP[Data Parsing]
+    DP --> RA[Risk Analysis]
+    RA --> SC[Semgrep Scan]
+    SC --> TR[Triage]
+    TR --> CF[Cross-File Analysis]
+
+    CF --> PAR[Parallel Review]
+    PAR --> LA[Logic Agent]
+    PAR --> SA[Security Agent]
+
+    LA --> RG[Report Generator]
+    SA --> RG
+    CF --> RG
+
+    RG --> PUB[GitHub Publisher]
+    PUB --> PR[PR Review & Comments]
+
+    style GH fill:#f0f9ff,stroke:#0284c7,stroke-width:2px
+    style PR fill:#f0f9ff,stroke:#0284c7,stroke-width:2px
+    style PAR fill:#fef3c7,stroke:#f59e0b,stroke-width:2px
+    style RG fill:#d1fae5,stroke:#10b981,stroke-width:2px
+```
+
+### LangGraph Workflow Nodes
+
+```mermaid
+graph LR
+    Start([Start]) --> Init[Initialization<br/>Parse PR Data]
+    Init --> Parse[Data Parsing<br/>Extract Diff]
+    Parse --> Risk[Risk Analysis<br/>AI Prioritization]
+    Risk --> Semgrep[Semgrep Scan<br/>Security Rules]
+    Semgrep --> Triage[Triage<br/>Priority Filter]
+    Triage --> Cross[Cross-File Analysis<br/>Impact Propagation]
+    Cross --> Parallel[Parallel Review<br/>Logic + Security]
+    Parallel --> Final[Final Report<br/>Consolidate Results]
+    Final --> End([End])
+
+    style Start fill:#f0f9ff,stroke:#0284c7
+    style End fill:#f0f9ff,stroke:#0284c7
+    style Parallel fill:#fef3c7,stroke:#f59e0b,stroke-width:2px
+    style Final fill:#d1fae5,stroke:#10b981,stroke-width:2px
+```
+
+### Agent Collaboration
+
+```mermaid
+graph TB
+    subgraph "Input Sources"
+        Diff[PR Diff Data]
+        Scan[Semgrep Scan Results]
+        Linter[Linter Results]
+    end
+
+    subgraph "Agents"
+        TriageAgent[Triage Agent<br/>Fast Pre-screening<br/>P0/P1/P2/P3/SKIP]
+        LogicAgent[Logic Agent<br/>Logic Defects<br/>Boundary/Null/Leaks]
+        SecurityAgent[Security Agent<br/>Vulnerabilities<br/>SQLi/XSS/RCE]
+    end
+
+    subgraph "Output"
+        Issues[Filtered Issues<br/>Relevance & Severity]
+        Report[Final Report]
+    end
+
+    Diff --> TriageAgent
+    Diff --> LogicAgent
+    Diff --> SecurityAgent
+
+    Scan -.->|Evidence Injection| LogicAgent
+    Scan -.->|Evidence Injection| SecurityAgent
+    Linter -.->|Style Issues| LogicAgent
+
+    TriageAgent --> Issues
+    LogicAgent --> Issues
+    SecurityAgent --> Issues
+
+    Issues --> Report
+
+    style TriageAgent fill:#f3e8ff,stroke:#9333ea
+    style LogicAgent fill:#dbeafe,stroke:#2563eb
+    style SecurityAgent fill:#fee2e2,stroke:#dc2626
+    style Report fill:#d1fae5,stroke:#10b981,stroke-width:2px
 ```
 
 ---
