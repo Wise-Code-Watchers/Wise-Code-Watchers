@@ -5,6 +5,8 @@ import json
 import os
 import threading
 import time
+import atexit
+import signal
 from queue import Queue
 from flask import Flask, request, jsonify
 from config import Config
@@ -16,6 +18,9 @@ from publish.github_publisher import GitHubPublisher
 from langchain_openai import ChatOpenAI
 from agents.vulnerability.src import WiseCodeWatchersWorkflow
 
+from langfuse import get_client, propagate_attributes
+from langfuse.langchain import CallbackHandler
+
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
@@ -23,6 +28,23 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 app = Flask(__name__)
+
+# Initialize Langfuse client for tracing
+langfuse_client = None
+langfuse_handler = None
+
+try:
+    if Config.LANGFUSE_PUBLIC_KEY and Config.LANGFUSE_SECRET_KEY:
+        langfuse_client = get_client()
+        langfuse_handler = CallbackHandler()
+        logger.info(f"Langfuse initialized: {Config.LANGFUSE_BASE_URL}")
+        logger.info(f"Langfuse tracing enabled with sample_rate={Config.LANGFUSE_SAMPLE_RATE}")
+    else:
+        logger.warning("Langfuse credentials not found, tracing disabled")
+except Exception as e:
+    logger.error(f"Failed to initialize Langfuse: {e}")
+    langfuse_client = None
+    langfuse_handler = None
 
 # 任务队列和线程池
 task_queue = Queue()
@@ -56,7 +78,7 @@ class PRTask:
         return f"PRTask(PR#{self.pr_number} in {self.repo_full_name})"
 
 
-def create_workflow_llm() -> ChatOpenAI:
+def create_workflow_llm(callbacks=None) -> ChatOpenAI:
     """Create LLM instance for the comprehensive workflow (OpenAI-compatible API)."""
     kwargs = {
         "model": Config.LLM_MODEL,
@@ -66,6 +88,17 @@ def create_workflow_llm() -> ChatOpenAI:
         kwargs["api_key"] = Config.LLM_API_KEY
     if Config.LLM_BASE_URL:
         kwargs["base_url"] = Config.LLM_BASE_URL
+
+    # Initialize with Langfuse callback handler if available
+    if langfuse_handler:
+        if callbacks is None:
+            callbacks = [langfuse_handler]
+        else:
+            callbacks = callbacks + [langfuse_handler]
+
+    if callbacks:
+        kwargs["callbacks"] = callbacks
+
     return ChatOpenAI(**kwargs)
 
 
@@ -96,98 +129,127 @@ def process_pr_task(task: PRTask):
     thread_name = threading.current_thread().name
     logger.info(f"[{thread_name}] Starting PR #{pr_number} processing in {repo_full_name}")
 
-    try:
-        # 使用缓存的GitHub客户端
-        client = get_github_client(installation_id)
-        llm = create_workflow_llm()
-        exporter = PRExporter(client, llm=llm)
-        git_client = GitClient()
+    # Langfuse Trace Context
+    session_id = f"{repo_full_name}-{pr_number}"
+    user_id = payload.get("sender", {}).get("login", "unknown")
 
-        logger.info(f"[{thread_name}] Exporting PR #{pr_number}")
-        pr_folder, functional_summary = exporter.export_pr_to_folder(repo_full_name, pr_number)
-        logger.info(f"[{thread_name}] Exported PR #{pr_number} to {pr_folder}")
+    with propagate_attributes(
+        session_id=session_id,
+        user_id=user_id,
+        metadata={
+            "pr_number": pr_number,
+            "repo_full_name": repo_full_name,
+            "action": action,
+            "installation_id": installation_id,
+        }
+    ):
+        if langfuse_client:
+            langfuse_client.update_current_trace(
+                name=f"pr-review-{repo_full_name}-{pr_number}",
+                session_id=session_id,
+                user_id=user_id,
+                metadata={
+                    "pr_title": pr.get("title", ""),
+                    "pr_author": pr.get("user", {}).get("login", ""),
+                    "base_branch": base_branch,
+                    "pr_additions": pr.get("additions", 0),
+                    "pr_deletions": pr.get("deletions", 0),
+                    "changed_files": pr.get("changed_files", 0),
+                }
+            )
 
-        # Publish functional summary if available
-        if functional_summary:
-            logger.info(f"[{thread_name}] Publishing functional summary for PR #{pr_number}")
+        try:
+            # 使用缓存的GitHub客户端
+            client = get_github_client(installation_id)
+            llm = create_workflow_llm()
+            exporter = PRExporter(client, llm=llm)
+            git_client = GitClient()
+
+            logger.info(f"[{thread_name}] Exporting PR #{pr_number}")
+            pr_folder, functional_summary = exporter.export_pr_to_folder(repo_full_name, pr_number)
+            logger.info(f"[{thread_name}] Exported PR #{pr_number} to {pr_folder}")
+
+            # Publish functional summary if available
+            if functional_summary:
+                logger.info(f"[{thread_name}] Publishing functional summary for PR #{pr_number}")
+                publisher = GitHubPublisher(client)
+                pr_metadata = client.get_pr_metadata(repo_full_name, pr_number)
+                summary_result = publisher.publish_functional_summary(
+                    functional_summary=functional_summary,
+                    pr_number=pr_number,
+                    repo_full_name=repo_full_name,
+                    pr_metadata=pr_metadata,
+                )
+                logger.info(f"[{thread_name}] Published functional summary: {summary_result}")
+
+            logger.info(f"[{thread_name}] Cloning {repo_full_name} branch {base_branch}")
+            installation_token = client.get_access_token()
+            clone_result = git_client.clone_for_pr(
+                repo_full_name=repo_full_name,
+                base_branch=base_branch,
+                installation_token=installation_token,
+            )
+
+            if not clone_result.success:
+                logger.error(f"[{thread_name}] Failed to clone repo: {clone_result.error}")
+                return
+
+            codebase_path = clone_result.path
+            logger.info(f"[{thread_name}] Cloned to {codebase_path}")
+
+            # Run comprehensive WiseCodeWatchersWorkflow with LangGraph
+            logger.info(f"[{thread_name}] Starting comprehensive workflow review for PR #{pr_number}")
+            workflow = WiseCodeWatchersWorkflow(llm=llm)
+
+            final_report = workflow.run(
+                pr_dir=pr_folder,
+                codebase_path=codebase_path,
+                top_n=20,
+                batch_size=8,
+                max_workers=4
+            )
+
+            # Extract issue counts from comprehensive report
+            logic_issues = final_report.get("logic_review", {}).get("issues_found", 0)
+            security_issues = final_report.get("security_review", {}).get("issues_found", 0)
+            total_issues = logic_issues + security_issues
+
+            logger.info(f"[{thread_name}] Comprehensive review complete. Found {total_issues} issues (logic: {logic_issues}, security: {security_issues})")
+
+            # Save comprehensive report to pr_folder
+            report_path = os.path.join(pr_folder, "out", "comprehensive_report.json")
+            os.makedirs(os.path.dirname(report_path), exist_ok=True)
+            with open(report_path, "w", encoding="utf-8") as f:
+                json.dump(final_report, f, ensure_ascii=False, indent=2)
+            logger.info(f"[{thread_name}] Saved comprehensive report to {report_path}")
+
+            # Load diff_ir for inline comments
+            diff_ir_path = os.path.join(pr_folder, "out", "diff_ir.json")
+            diff_ir = None
+            if os.path.exists(diff_ir_path):
+                try:
+                    with open(diff_ir_path, "r", encoding="utf-8") as f:
+                        diff_ir = json.load(f)
+                    logger.info(f"[{thread_name}] Loaded diff_ir from {diff_ir_path}")
+                except Exception as e:
+                    logger.warning(f"[{thread_name}] Failed to load diff_ir.json: {e}")
+
+            # Publish to GitHub with inline comments
             publisher = GitHubPublisher(client)
-            pr_metadata = client.get_pr_metadata(repo_full_name, pr_number)
-            summary_result = publisher.publish_functional_summary(
-                functional_summary=functional_summary,
+            publish_result = publisher.publish_comprehensive_report(
+                final_report=final_report,
                 pr_number=pr_number,
                 repo_full_name=repo_full_name,
-                pr_metadata=pr_metadata,
+                diff_ir=diff_ir,
             )
-            logger.info(f"[{thread_name}] Published functional summary: {summary_result}")
+            logger.info(f"[{thread_name}] Published comprehensive review: {publish_result}")
 
-        logger.info(f"[{thread_name}] Cloning {repo_full_name} branch {base_branch}")
-        installation_token = client.get_access_token()
-        clone_result = git_client.clone_for_pr(
-            repo_full_name=repo_full_name,
-            base_branch=base_branch,
-            installation_token=installation_token,
-        )
+            git_client.cleanup(codebase_path)
 
-        if not clone_result.success:
-            logger.error(f"[{thread_name}] Failed to clone repo: {clone_result.error}")
-            return
+            logger.info(f"[{thread_name}] ✓ PR #{pr_number} processing completed successfully")
 
-        codebase_path = clone_result.path
-        logger.info(f"[{thread_name}] Cloned to {codebase_path}")
-
-        # Run comprehensive WiseCodeWatchersWorkflow with LangGraph
-        logger.info(f"[{thread_name}] Starting comprehensive workflow review for PR #{pr_number}")
-        workflow = WiseCodeWatchersWorkflow(llm=llm)
-
-        final_report = workflow.run(
-            pr_dir=pr_folder,
-            codebase_path=codebase_path,
-            top_n=20,
-            batch_size=8,
-            max_workers=4
-        )
-
-        # Extract issue counts from comprehensive report
-        logic_issues = final_report.get("logic_review", {}).get("issues_found", 0)
-        security_issues = final_report.get("security_review", {}).get("issues_found", 0)
-        total_issues = logic_issues + security_issues
-
-        logger.info(f"[{thread_name}] Comprehensive review complete. Found {total_issues} issues (logic: {logic_issues}, security: {security_issues})")
-
-        # Save comprehensive report to pr_folder
-        report_path = os.path.join(pr_folder, "out", "comprehensive_report.json")
-        os.makedirs(os.path.dirname(report_path), exist_ok=True)
-        with open(report_path, "w", encoding="utf-8") as f:
-            json.dump(final_report, f, ensure_ascii=False, indent=2)
-        logger.info(f"[{thread_name}] Saved comprehensive report to {report_path}")
-
-        # Load diff_ir for inline comments
-        diff_ir_path = os.path.join(pr_folder, "out", "diff_ir.json")
-        diff_ir = None
-        if os.path.exists(diff_ir_path):
-            try:
-                with open(diff_ir_path, "r", encoding="utf-8") as f:
-                    diff_ir = json.load(f)
-                logger.info(f"[{thread_name}] Loaded diff_ir from {diff_ir_path}")
-            except Exception as e:
-                logger.warning(f"[{thread_name}] Failed to load diff_ir.json: {e}")
-
-        # Publish to GitHub with inline comments
-        publisher = GitHubPublisher(client)
-        publish_result = publisher.publish_comprehensive_report(
-            final_report=final_report,
-            pr_number=pr_number,
-            repo_full_name=repo_full_name,
-            diff_ir=diff_ir,
-        )
-        logger.info(f"[{thread_name}] Published comprehensive review: {publish_result}")
-
-        git_client.cleanup(codebase_path)
-
-        logger.info(f"[{thread_name}] ✓ PR #{pr_number} processing completed successfully")
-
-    except Exception as e:
-        logger.error(f"[{thread_name}] ✗ Error processing PR #{pr_number}: {e}", exc_info=True)
+        except Exception as e:
+            logger.error(f"[{thread_name}] ✗ Error processing PR #{pr_number}: {e}", exc_info=True)
 
 
 def worker():
@@ -334,6 +396,34 @@ def config_status():
         "monitored_repos_count": len(monitored_repos) if monitored_repos else 0,
         "config_description": "Monitoring specific repositories" if monitored_repos else "Monitoring all repositories with GitHub App installed"
     }), 200
+
+
+# Langfuse Shutdown Handlers
+def cleanup_langfuse():
+    """Flush Langfuse traces on shutdown."""
+    if langfuse_client:
+        logger.info("Flushing Langfuse traces...")
+        try:
+            langfuse_client.flush()
+            logger.info("Langfuse traces flushed successfully")
+        except Exception as e:
+            logger.error(f"Failed to flush Langfuse traces: {e}")
+
+
+# Register cleanup on exit
+atexit.register(cleanup_langfuse)
+
+
+# Handle SIGTERM and SIGINT for graceful shutdown
+def signal_handler(signum, frame):
+    logger.info(f"Received signal {signum}, shutting down...")
+    cleanup_langfuse()
+    signal.signal(signum, signal.SIG_DFL)
+    os.kill(os.getpid(), signum)
+
+
+signal.signal(signal.SIGTERM, signal_handler)
+signal.signal(signal.SIGINT, signal_handler)
 
 
 if __name__ == "__main__":

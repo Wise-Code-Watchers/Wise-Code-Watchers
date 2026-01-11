@@ -29,6 +29,7 @@
 - 💬 **Deep GitHub Integration**: Automatically posts inline comments to PRs with GitHub App Webhook support
 - 🗳️ **LLM Consensus Voting**: 3 LLMs analyze each feature in parallel, selecting the best result to avoid single-point bias
 - 🛡️ **Nil-Guard Filter**: Automatically filters nil/NoMethodError false positives to improve report quality
+- 🔍 **Full Observability with Langfuse**: Automatic tracing of all LLM calls, LangGraph workflows, and agent executions with rich metadata
 
 ---
 
@@ -71,6 +72,14 @@
 │                         │    GitHub Publisher      │                        │
 │                         │  (PR Comments/Reviews)   │                        │
 │                         └──────────────────────────┘                        │
+│                                                                              │
+│  ┌──────────────────────────────────────────────────────────────────────┐  │
+│  │                    🔍 Langfuse Tracing                              │  │
+│  │  ┌────────────┐  ┌────────────┐  ┌────────────┐  ┌────────────┐    │  │
+│  │  │  LLM Calls │  │  Workflows │  │   Agents   │  │   Tools    │    │  │
+│  │  │   Traced   │  │   Traced   │  │   Traced   │  │   Traced   │    │  │
+│  │  └────────────┘  └────────────┘  └────────────┘  └────────────┘    │  │
+│  └──────────────────────────────────────────────────────────────────────┘  │
 └─────────────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -264,6 +273,12 @@ BASE_URL=https://api.openai.com/v1
 OPENAI_API_KEY=your_openai_api_key
 MODEL=gpt-4
 
+# Langfuse Observability (Optional)
+LANGFUSE_PUBLIC_KEY=pk-lf-your-public-key
+LANGFUSE_SECRET_KEY=sk-lf-your-secret-key
+LANGFUSE_BASE_URL=https://cloud.langfuse.com
+LANGFUSE_SAMPLE_RATE=1.0
+
 # Service Configuration
 PORT=3000
 
@@ -287,16 +302,20 @@ docker-compose up -d
 
 ### Environment Variables
 
-| Variable Name                | Required | Default     | Description                          |
-| ---------------------------- | -------- | ----------- | ------------------------------------ |
-| `GITHUB_APP_ID`              | ✅        | -           | GitHub App ID                        |
-| `GITHUB_PRIVATE_KEY_PATH`    | ✅        | -           | Private key file path                |
-| `GITHUB_WEBHOOK_SECRET`      | ✅        | -           | Webhook secret                       |
-| `BASE_URL`                   | ⚠️        | -           | LLM API base URL (OpenAI-compatible) |
-| `OPENAI_API_KEY`             | ⚠️        | -           | OpenAI API Key                       |
-| `MODEL`                      | ❌        | `GLM-4.6`   | Model name                            |
-| `PORT`                       | ❌        | `3000`      | Service port                         |
-| `MONITORED_REPOS`            | ❌        | `*` (all)   | Comma-separated repository names to monitor (e.g., `repo1,repo2`). Empty or `*` means monitor all repositories where the GitHub App is installed |
+| Variable Name                | Required | Default            | Description                          |
+| ---------------------------- | -------- | ------------------ | ------------------------------------ |
+| `GITHUB_APP_ID`              | ✅        | -                  | GitHub App ID                        |
+| `GITHUB_PRIVATE_KEY_PATH`    | ✅        | -                  | Private key file path                |
+| `GITHUB_WEBHOOK_SECRET`      | ✅        | -                  | Webhook secret                       |
+| `BASE_URL`                   | ⚠️        | -                  | LLM API base URL (OpenAI-compatible) |
+| `OPENAI_API_KEY`             | ⚠️        | -                  | OpenAI API Key                       |
+| `MODEL`                      | ❌        | `GLM-4.6`          | Model name                            |
+| `PORT`                       | ❌        | `3000`             | Service port                         |
+| `MONITORED_REPOS`            | ❌        | `*` (all)          | Comma-separated repository names to monitor (e.g., `repo1,repo2`). Empty or `*` means monitor all repositories where the GitHub App is installed |
+| `LANGFUSE_PUBLIC_KEY`        | ❌        | -                  | Langfuse public key for LLM observability tracing |
+| `LANGFUSE_SECRET_KEY`        | ❌        | -                  | Langfuse secret key for LLM observability tracing |
+| `LANGFUSE_BASE_URL`          | ❌        | `https://cloud.langfuse.com` | Langfuse server URL (use your self-hosted URL) |
+| `LANGFUSE_SAMPLE_RATE`       | ❌        | `1.0`              | Langfuse tracing sampling rate (0.0-1.0, 1.0 = trace all) |
 
 ### GitHub App Configuration
 
@@ -314,6 +333,97 @@ docker-compose up -d
      - Pull request
 
 3. Generate and download the private key file
+
+---
+
+## 🔍 Langfuse Observability
+
+Wise Code Watchers integrates with [Langfuse](https://langfuse.com) for comprehensive LLM observability and tracing. All LangChain LLM calls, LangGraph workflows, and agent executions are automatically traced with rich metadata.
+
+### What Gets Traced?
+
+- **LLM Calls**: All OpenAI-compatible LLM invocations with prompts, responses, and token usage
+- **LangGraph Workflows**: Multi-agent workflow execution with node-by-node tracing
+- **Agent Executions**: Logic Agent, Security Agent, and Triage Agent operations
+- **Tool Calls**: Semgrep scans, Git operations, and other tool executions
+- **PR Metadata**: Repository name, PR number, author, branch, and change statistics
+
+### Setting Up Langfuse
+
+1. **Get Langfuse Credentials**:
+   - Sign up at [langfuse.com](https://langfuse.com) or self-host Langfuse
+   - Create a new project and generate API keys
+   - Copy your public key and secret key
+
+2. **Configure Environment Variables**:
+   ```bash
+   # Add to your .env file
+   LANGFUSE_PUBLIC_KEY=pk-lf-your-public-key
+   LANGFUSE_SECRET_KEY=sk-lf-your-secret-key
+   LANGFUSE_BASE_URL=https://cloud.langfuse.com  # or your self-hosted URL
+   LANGFUSE_SAMPLE_RATE=1.0  # 1.0 = trace all, 0.1 = trace 10%
+   ```
+
+3. **Restart the Service**:
+   ```bash
+   python app.py
+   ```
+
+4. **Verify Tracing**:
+   - Check logs for: `Langfuse initialized: <your-base-url>`
+   - Trigger a PR review
+   - Visit your Langfuse dashboard to see traces
+
+### Trace Metadata
+
+Each PR review trace includes:
+
+- **Session ID**: `{repo_full_name}-{pr_number}`
+- **User ID**: GitHub username of the PR author
+- **Trace Name**: `pr-review-{repo_full_name}-{pr_number}`
+- **Metadata**:
+  - PR title and author
+  - Base branch name
+  - Additions/deletions count
+  - Number of changed files
+
+### Sampling Rate
+
+Control what percentage of PR reviews get traced:
+
+- `LANGFUSE_SAMPLE_RATE=1.0` - Trace all PR reviews (recommended for debugging)
+- `LANGFUSE_SAMPLE_RATE=0.1` - Trace 10% of PR reviews (recommended for production)
+- `LANGFUSE_SAMPLE_RATE=0.0` - Disable tracing
+
+### Viewing Traces
+
+Open your Langfuse dashboard to:
+
+- **Search traces**: Filter by repo, PR number, or user
+- **View timeline**: See the complete execution timeline with all LLM calls
+- **Analyze performance**: Identify bottlenecks in agent execution
+- **Debug issues**: Inspect prompts, responses, and error messages
+- **Track costs**: Monitor token usage across all LLM calls
+
+### Example Trace Structure
+
+```
+pr-review-org/repo-123
+├── Export PR Data
+├── Clone Repository
+├── LangGraph Workflow
+│   ├── Data Parsing
+│   ├── Risk Analysis
+│   ├── Semgrep Scanning
+│   ├── Logic Agent
+│   │   ├── LLM Call 1
+│   │   └── LLM Call 2
+│   ├── Security Agent
+│   │   ├── LLM Call 1
+│   │   └── LLM Call 2
+│   └── Report Generation
+└── Publish to GitHub
+```
 
 ---
 
@@ -615,6 +725,7 @@ This project is licensed under the MIT License - see [LICENSE](LICENSE) file for
 
 - [LangChain](https://github.com/langchain-ai/langchain) - LLM application framework
 - [LangGraph](https://github.com/langchain-ai/langgraph) - Multi-agent workflow
+- [Langfuse](https://langfuse.com) - LLM observability and tracing platform
 - [Semgrep](https://github.com/semgrep/semgrep) - Code scanning engine
 - [PyGithub](https://github.com/PyGithub/PyGithub) - GitHub API client
 

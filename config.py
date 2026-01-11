@@ -15,6 +15,12 @@ class Config:
     LLM_BASE_URL = os.getenv("BASE_URL") or os.getenv("LLM_BASE_URL")
     LLM_MODEL = os.getenv("MODEL") or os.getenv("LLM_MODEL", "GLM-4.6")
 
+    # Langfuse Configuration
+    LANGFUSE_PUBLIC_KEY = os.getenv("LANGFUSE_PUBLIC_KEY")
+    LANGFUSE_SECRET_KEY = os.getenv("LANGFUSE_SECRET_KEY")
+    LANGFUSE_BASE_URL = os.getenv("LANGFUSE_BASE_URL")
+    LANGFUSE_SAMPLE_RATE = float(os.getenv("LANGFUSE_SAMPLE_RATE", "1.0"))
+
     # Enhanced Vulnerability Detection Configuration
     VULN_RISK_THRESHOLD_LOGIC = int(os.getenv("VULN_RISK_THRESHOLD_LOGIC", 60))
     VULN_RISK_THRESHOLD_SECURITY = int(os.getenv("VULN_RISK_THRESHOLD_SECURITY", 60))
